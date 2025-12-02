@@ -16,22 +16,26 @@ Native WebCodecs API implementation for Node.js, using FFmpeg for encoding and d
 
 - Node.js 18+
 - FFmpeg libraries (libavcodec, libavutil, libswscale, libswresample)
-- CMake 3.15+ (for building)
+- pkg-config (for finding FFmpeg during build)
+- A C++ compiler (Xcode Command Line Tools on macOS, build-essential on Linux)
 
-### Installing FFmpeg
+### Installing Dependencies
 
 **macOS (Homebrew):**
 ```bash
-brew install ffmpeg
+brew install ffmpeg pkg-config
+
+# Ensure Homebrew is in your PATH (add to ~/.zshrc or ~/.bashrc)
+export PATH="/opt/homebrew/bin:$PATH"
 ```
 
 **Ubuntu/Debian:**
 ```bash
-sudo apt-get install libavcodec-dev libavutil-dev libswscale-dev libswresample-dev
+sudo apt-get install build-essential pkg-config libavcodec-dev libavutil-dev libswscale-dev libswresample-dev
 ```
 
 **Windows:**
-Install FFmpeg and add to PATH, or use vcpkg.
+Install FFmpeg and add to PATH, or use vcpkg. Ensure `pkg-config` is available.
 
 ## Installation
 
@@ -250,8 +254,8 @@ See the `examples/` directory for more usage examples:
 ## Building from Source
 
 ```bash
-git clone https://github.com/user/webcodecs-node.git
-cd webcodecs-node
+git clone https://github.com/caseymanos/node-webcodecs.git
+cd node-webcodecs
 npm install
 npm run build
 npm test
