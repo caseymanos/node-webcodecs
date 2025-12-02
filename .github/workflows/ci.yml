@@ -27,7 +27,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libavcodec-dev libavutil-dev libswscale-dev libswresample-dev
+          sudo apt-get install -y libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev
 
       - name: Install FFmpeg (macOS)
         if: runner.os == 'macOS'
