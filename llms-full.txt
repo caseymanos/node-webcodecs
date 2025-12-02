@@ -1,0 +1,2990 @@
+# node-webcodecs - Complete LLM Documentation
+
+Version: 0.4.0
+Last Updated: 2025-12-02
+
+---
+
+## Table of Contents
+
+1. Package Introduction
+2. Installation & Setup
+3. Quick Start Examples
+4. Core API Reference
+5. Codec Information
+6. Advanced Features
+7. Complete Working Examples
+8. Configuration Reference
+9. Real-World Use Cases
+10. Troubleshooting Guide
+11. TypeScript Integration
+12. Native Utilities
+13. Bun Runtime Support
+14. Building from Source
+
+---
+
+## 1. Package Introduction
+
+### What is node-webcodecs?
+
+node-webcodecs is a native implementation of the W3C WebCodecs API for Node.js and Bun, using FFmpeg for encoding and decoding. It provides frame-level access to video and audio codecs without subprocess overhead.
+
+### Key Differentiators from FFmpeg CLI
+
+**FFmpeg CLI Approach:**
+- Subprocess spawning with command-line string parsing
+- Limited programmatic control over individual frames
+- Complex filter_complex syntax for dynamic operations
+- No direct frame manipulation in JavaScript
+- Debugging through stderr parsing
+
+**node-webcodecs Approach:**
+- Native C++ bindings with direct FFmpeg library access
+- Frame-by-frame control with JavaScript callbacks
+- Programmatic frame manipulation using standard JS
+- Hardware acceleration with queryable support
+- Browser-compatible API for isomorphic code
+
+### W3C WebCodecs API Compatibility
+
+node-webcodecs implements the same interfaces as the browser WebCodecs API:
+- VideoEncoder, VideoDecoder
+- AudioEncoder, AudioDecoder
+- VideoFrame, AudioData
+- EncodedVideoChunk, EncodedAudioChunk
+- ImageDecoder
+
+This enables isomorphic video processing where the same code runs in both browser and server environments.
+
+### Platform Support
+
+**Operating Systems:**
+- macOS (arm64, x64)
+- Linux (x64, arm64)
+- Windows (x64)
+
+**Hardware Acceleration:**
+- macOS: VideoToolbox (H.264, HEVC encode/decode)
+- Windows/Linux: NVIDIA NVENC (H.264, HEVC, AV1 encode)
+- Windows/Linux: Intel QuickSync (H.264, HEVC, VP9, AV1)
+- Linux: VA-API (H.264, HEVC, VP9, AV1)
+
+### Runtime Support
+
+**Node.js 18+**
+- Full N-API support
+- Async worker thread pool for non-blocking operations
+- Native addons with prebuild support
+
+**Bun 1.0+**
+- N-API compatibility layer
+- Same package, zero configuration
+- Trust package may be required for native compilation
+
+---
+
+## 2. Installation & Setup
+
+### System Dependencies
+
+**macOS (Homebrew):**
+
+```bash
+# Install FFmpeg and pkg-config
+brew install ffmpeg pkg-config
+
+# Ensure Homebrew is in PATH (add to ~/.zshrc or ~/.bashrc)
+export PATH="/opt/homebrew/bin:$PATH"
+
+# Verify installation
+pkg-config --modversion libavcodec
+```
+
+**Ubuntu/Debian:**
+
+```bash
+# Install build tools and FFmpeg development libraries
+sudo apt-get update
+sudo apt-get install build-essential pkg-config \
+  libavcodec-dev libavutil-dev libswscale-dev \
+  libswresample-dev libavformat-dev
+
+# Verify installation
+pkg-config --modversion libavcodec
+```
+
+**Windows:**
+
+1. Install FFmpeg via vcpkg or download pre-built binaries
+2. Add FFmpeg to system PATH
+3. Install pkg-config (via Chocolatey: `choco install pkgconfiglite`)
+4. Install Visual Studio Build Tools with C++ support
+
+### Package Installation
+
+**npm:**
+
+```bash
+npm install node-webcodecs
+```
+
+**Bun:**
+
+```bash
+bun add node-webcodecs
+
+# If native compilation fails, trust the package
+bun pm trust node-webcodecs
+```
+
+### Verification
+
+```javascript
+const { getFFmpegVersion, listCodecs } = require('node-webcodecs');
+
+// Check FFmpeg version
+const version = getFFmpegVersion();
+console.log('FFmpeg version:', version);
+
+// List available codecs
+const codecs = listCodecs();
+console.log('Encoders:', codecs.encoders.length);
+console.log('Decoders:', codecs.decoders.length);
+```
+
+### Common Installation Issues
+
+**"pkg-config not found":**
+- Install pkg-config via package manager
+- Ensure pkg-config is in PATH
+
+**"FFmpeg libraries not found":**
+- Verify FFmpeg is installed: `pkg-config --libs libavcodec`
+- Check library paths are correct
+- On macOS, ensure Homebrew paths are exported
+
+**Build failures:**
+- Ensure C++ compiler is available (Xcode CLI on macOS, build-essential on Linux)
+- Check FFmpeg version is 4.x or newer (6.x recommended)
+- Try `npm rebuild node-webcodecs` to recompile
+
+---
+
+## 3. Quick Start Examples
+
+### Video Encoding (Basic)
+
+```javascript
+const { VideoEncoder, VideoFrame } = require('node-webcodecs');
+
+async function encodeVideo() {
+  const encodedChunks = [];
+
+  // Create encoder with output callback
+  const encoder = new VideoEncoder({
+    output: (chunk, metadata) => {
+      console.log(`Encoded: ${chunk.byteLength} bytes, type: ${chunk.type}`);
+      encodedChunks.push(chunk);
+
+      // Metadata contains decoder configuration on first keyframe
+      if (metadata?.decoderConfig) {
+        console.log('Decoder config:', metadata.decoderConfig);
+      }
+    },
+    error: (err) => {
+      console.error('Encoding error:', err);
+    },
+  });
+
+  // Configure for H.264 encoding
+  encoder.configure({
+    codec: 'avc1.42E01E',  // H.264 Baseline Profile Level 3.0
+    width: 640,
+    height: 480,
+    bitrate: 1_000_000,    // 1 Mbps
+    framerate: 30,
+  });
+
+  // Create and encode frames
+  const frameDuration = 33333;  // 30fps in microseconds
+
+  for (let i = 0; i < 30; i++) {
+    // Create RGBA frame data
+    const data = new Uint8Array(640 * 480 * 4);
+    const brightness = 50 + (i * 5);
+
+    for (let j = 0; j < data.length; j += 4) {
+      data[j] = brightness;      // R
+      data[j + 1] = brightness;  // G
+      data[j + 2] = brightness;  // B
+      data[j + 3] = 255;         // A (fully opaque)
+    }
+
+    // Create VideoFrame from buffer
+    const frame = new VideoFrame(data, {
+      format: 'RGBA',
+      codedWidth: 640,
+      codedHeight: 480,
+      timestamp: i * frameDuration,
+    });
+
+    // Encode frame (first frame as keyframe)
+    encoder.encode(frame, { keyFrame: i === 0 });
+
+    // IMPORTANT: Always close frames to free memory
+    frame.close();
+  }
+
+  // Flush remaining frames
+  await encoder.flush();
+
+  // Close encoder
+  encoder.close();
+
+  console.log(`Encoded ${encodedChunks.length} chunks`);
+  return encodedChunks;
+}
+
+encodeVideo().catch(console.error);
+```
+
+### Video Decoding (Basic)
+
+```javascript
+const { VideoDecoder, EncodedVideoChunk } = require('node-webcodecs');
+
+async function decodeVideo(encodedChunks, decoderConfig) {
+  const decodedFrames = [];
+
+  // Create decoder with output callback
+  const decoder = new VideoDecoder({
+    output: (frame) => {
+      console.log(`Decoded: ${frame.codedWidth}x${frame.codedHeight} @ ${frame.timestamp}µs`);
+      decodedFrames.push(frame);
+
+      // Note: Don't close frames here if you need them later
+      // Close them after processing
+    },
+    error: (err) => {
+      console.error('Decoding error:', err);
+    },
+  });
+
+  // Configure decoder
+  decoder.configure({
+    codec: 'avc1.42E01E',
+    codedWidth: 640,
+    codedHeight: 480,
+    description: decoderConfig?.description,  // Optional extradata
+  });
+
+  // Decode all chunks
+  for (const chunk of encodedChunks) {
+    decoder.decode(chunk);
+  }
+
+  // Flush decoder
+  await decoder.flush();
+
+  // Close decoder
+  decoder.close();
+
+  console.log(`Decoded ${decodedFrames.length} frames`);
+
+  // Process frames and close them
+  decodedFrames.forEach(frame => {
+    // Do something with frame...
+    frame.close();  // Free memory
+  });
+}
+```
+
+### Audio Encoding (Basic)
+
+```javascript
+const { AudioEncoder, AudioData } = require('node-webcodecs');
+
+async function encodeAudio() {
+  const encodedChunks = [];
+
+  const encoder = new AudioEncoder({
+    output: (chunk, metadata) => {
+      console.log(`Encoded audio: ${chunk.byteLength} bytes`);
+      encodedChunks.push(chunk);
+    },
+    error: (err) => console.error('Audio encoding error:', err),
+  });
+
+  // Configure for AAC-LC encoding
+  encoder.configure({
+    codec: 'mp4a.40.2',    // AAC-LC
+    sampleRate: 48000,
+    numberOfChannels: 2,   // Stereo
+    bitrate: 128000,       // 128 kbps
+  });
+
+  // Generate 440 Hz sine wave (A note)
+  const sampleRate = 48000;
+  const frequency = 440;
+  const duration = 1.0;  // 1 second
+  const numSamples = Math.floor(sampleRate * duration);
+  const numChannels = 2;
+
+  // Create interleaved float32 audio data (L, R, L, R, ...)
+  const audioBuffer = new Float32Array(numSamples * numChannels);
+
+  for (let i = 0; i < numSamples; i++) {
+    const t = i / sampleRate;
+    const sample = Math.sin(2 * Math.PI * frequency * t) * 0.5;
+    audioBuffer[i * 2] = sample;      // Left
+    audioBuffer[i * 2 + 1] = sample;  // Right
+  }
+
+  // Create AudioData
+  const audio = new AudioData({
+    format: 'f32',             // Float32 format
+    sampleRate: sampleRate,
+    numberOfFrames: numSamples,
+    numberOfChannels: numChannels,
+    timestamp: 0,
+    data: audioBuffer,
+  });
+
+  // Encode audio
+  encoder.encode(audio);
+  audio.close();
+
+  // Flush encoder
+  await encoder.flush();
+  encoder.close();
+
+  console.log(`Encoded ${encodedChunks.length} audio chunks`);
+  return encodedChunks;
+}
+
+encodeAudio().catch(console.error);
+```
+
+### Audio Decoding (Basic)
+
+```javascript
+const { AudioDecoder, EncodedAudioChunk } = require('node-webcodecs');
+
+async function decodeAudio(encodedChunks) {
+  const decodedAudio = [];
+
+  const decoder = new AudioDecoder({
+    output: (audioData) => {
+      console.log(`Decoded: ${audioData.numberOfFrames} samples @ ${audioData.sampleRate}Hz`);
+      decodedAudio.push(audioData);
+    },
+    error: (err) => console.error('Audio decoding error:', err),
+  });
+
+  decoder.configure({
+    codec: 'mp4a.40.2',
+    sampleRate: 48000,
+    numberOfChannels: 2,
+  });
+
+  for (const chunk of encodedChunks) {
+    decoder.decode(chunk);
+  }
+
+  await decoder.flush();
+  decoder.close();
+
+  // Process and close audio data
+  decodedAudio.forEach(audio => {
+    // Extract samples...
+    audio.close();
+  });
+}
+```
+
+### Image Decoding (Basic)
+
+```javascript
+const { ImageDecoder } = require('node-webcodecs');
+const fs = require('fs');
+
+async function decodeImage(filePath) {
+  // Read image file
+  const imageData = fs.readFileSync(filePath);
+
+  // Create ImageDecoder
+  const decoder = new ImageDecoder({
+    data: imageData,
+    type: 'image/jpeg',  // or 'image/png', 'image/webp', etc.
+  });
+
+  // Wait for decoder to be ready
+  await decoder.completed;
+
+  console.log('Image type:', decoder.type);
+  console.log('Frames:', decoder.tracks.selectedTrack.frameCount);
+
+  // Decode first frame
+  const result = await decoder.decode({ frameIndex: 0 });
+  const frame = result.image;
+
+  console.log(`Decoded: ${frame.codedWidth}x${frame.codedHeight}`);
+  console.log(`Format: ${frame.format}`);
+
+  // Use frame...
+  // frame is a VideoFrame - you can encode it or process pixels
+
+  // Clean up
+  frame.close();
+  decoder.close();
+}
+
+decodeImage('photo.jpg').catch(console.error);
+```
+
+---
+
+## 4. Core API Reference
+
+### 4.1 VideoEncoder
+
+**Constructor:**
+```typescript
+new VideoEncoder(init: VideoEncoderInit)
+```
+
+**init parameters:**
+- `output(chunk: EncodedVideoChunk, metadata?: VideoEncoderOutputMetadata): void` - Called for each encoded chunk
+- `error(error: DOMException): void` - Called on encoding errors
+
+**Methods:**
+
+**configure(config: VideoEncoderConfig): void**
+Configures encoder with codec and parameters.
+
+```javascript
+encoder.configure({
+  codec: 'avc1.42E01E',       // Required: Codec string
+  width: 1920,                // Required: Frame width
+  height: 1080,               // Required: Frame height
+  bitrate: 5_000_000,         // Optional: Target bitrate in bps
+  framerate: 30,              // Optional: Frame rate
+  hardwareAcceleration: 'prefer-hardware', // Optional
+  latencyMode: 'quality',     // Optional: 'quality' | 'realtime'
+  bitrateMode: 'variable',    // Optional: 'constant' | 'variable' | 'quantizer'
+  alpha: 'discard',           // Optional: 'discard' | 'keep'
+  scalabilityMode: 'L1T2',    // Optional: SVC mode
+  colorSpace: {               // Optional: Color space
+    primaries: 'bt709',
+    transfer: 'bt709',
+    matrix: 'bt709',
+  },
+  avc: {                      // Optional: H.264 specific
+    format: 'annexb',         // 'annexb' | 'avc'
+  },
+  useWorkerThread: true,      // Optional: Use async encoding (default: true)
+});
+```
+
+**encode(frame: VideoFrame, options?: VideoEncoderEncodeOptions): void**
+Encodes a video frame.
+
+```javascript
+encoder.encode(frame, { keyFrame: true });  // Force keyframe
+encoder.encode(frame);                       // Let encoder decide
+```
+
+**async flush(): Promise<void>**
+Flushes all pending frames. Returns promise that resolves when complete.
+
+```javascript
+await encoder.flush();
+```
+
+**reset(): void**
+Resets encoder to unconfigured state. Discards pending frames.
+
+**close(): void**
+Closes encoder and releases resources. Cannot be used after closing.
+
+**State Properties:**
+- `state: CodecState` - Current state: 'unconfigured' | 'configured' | 'closed'
+- `encodeQueueSize: number` - Number of pending encode operations
+
+**Event Support:**
+```javascript
+encoder.addEventListener('dequeue', () => {
+  console.log('Queue emptied, safe to encode more');
+});
+```
+
+**Static Methods:**
+
+**async isConfigSupported(config: VideoEncoderConfig): Promise<VideoEncoderSupport>**
+Tests if a configuration is supported.
+
+```javascript
+const support = await VideoEncoder.isConfigSupported({
+  codec: 'avc1.42E01E',
+  width: 1920,
+  height: 1080,
+});
+
+if (support.supported) {
+  encoder.configure(support.config);
+}
+```
+
+### 4.2 VideoDecoder
+
+**Constructor:**
+```typescript
+new VideoDecoder(init: VideoDecoderInit)
+```
+
+**init parameters:**
+- `output(frame: VideoFrame): void` - Called for each decoded frame
+- `error(error: DOMException): void` - Called on decoding errors
+
+**Methods:**
+
+**configure(config: VideoDecoderConfig): void**
+Configures decoder.
+
+```javascript
+decoder.configure({
+  codec: 'avc1.42E01E',         // Required: Codec string
+  codedWidth: 1920,             // Required: Frame width
+  codedHeight: 1080,            // Required: Frame height
+  description: extradata,       // Optional: Codec extradata (ArrayBuffer)
+  hardwareAcceleration: 'prefer-hardware', // Optional
+  useWorkerThread: true,        // Optional: Use async decoding (default: true)
+});
+```
+
+**decode(chunk: EncodedVideoChunk): void**
+Decodes an encoded chunk.
+
+```javascript
+decoder.decode(chunk);
+```
+
+**async flush(): Promise<void>**
+Flushes all pending chunks.
+
+**reset(): void**
+Resets decoder to unconfigured state.
+
+**close(): void**
+Closes decoder and releases resources.
+
+**State Properties:**
+- `state: CodecState` - Current state
+- `decodeQueueSize: number` - Number of pending decode operations
+
+**Static Methods:**
+
+**async isConfigSupported(config: VideoDecoderConfig): Promise<VideoDecoderSupport>**
+Tests if a configuration is supported.
+
+### 4.3 AudioEncoder
+
+**Constructor:**
+```typescript
+new AudioEncoder(init: AudioEncoderInit)
+```
+
+**Methods:**
+
+**configure(config: AudioEncoderConfig): void**
+```javascript
+encoder.configure({
+  codec: 'mp4a.40.2',      // Required: AAC-LC, opus, flac, mp3
+  sampleRate: 48000,       // Required: Sample rate in Hz
+  numberOfChannels: 2,     // Required: Number of channels
+  bitrate: 128000,         // Optional: Target bitrate in bps
+});
+```
+
+**encode(data: AudioData): void**
+Encodes audio data.
+
+**async flush(): Promise<void>**
+Flushes pending audio.
+
+**reset(): void**
+Resets encoder.
+
+**close(): void**
+Closes encoder.
+
+### 4.4 AudioDecoder
+
+**Constructor:**
+```typescript
+new AudioDecoder(init: AudioDecoderInit)
+```
+
+**Methods:**
+
+**configure(config: AudioDecoderConfig): void**
+```javascript
+decoder.configure({
+  codec: 'mp4a.40.2',
+  sampleRate: 48000,
+  numberOfChannels: 2,
+  description: extradata,  // Optional
+});
+```
+
+**decode(chunk: EncodedAudioChunk): void**
+Decodes an encoded chunk.
+
+**async flush(): Promise<void>**
+Flushes pending chunks.
+
+**reset(): void**
+Resets decoder.
+
+**close(): void**
+Closes decoder.
+
+### 4.5 ImageDecoder
+
+**Constructor:**
+```typescript
+new ImageDecoder(init: ImageDecoderInit)
+```
+
+**init parameters:**
+```javascript
+const decoder = new ImageDecoder({
+  data: imageBuffer,           // ArrayBuffer or Uint8Array
+  type: 'image/jpeg',          // MIME type
+});
+```
+
+**Properties:**
+- `type: string` - MIME type of image
+- `completed: Promise<void>` - Resolves when decoder is ready
+- `tracks: ImageTrackList` - Track information
+
+**Methods:**
+
+**async decode(options: ImageDecodeOptions): Promise<ImageDecodeResult>**
+```javascript
+const result = await decoder.decode({ frameIndex: 0 });
+const frame = result.image;  // VideoFrame
+```
+
+**close(): void**
+Closes decoder.
+
+**Supported Image Types:**
+- image/jpeg
+- image/png
+- image/gif (including animated)
+- image/webp
+- image/bmp
+
+### 4.6 VideoFrame
+
+**Constructor (from buffer):**
+```typescript
+new VideoFrame(data: BufferSource, init: VideoFrameBufferInit)
+```
+
+```javascript
+const frame = new VideoFrame(rgbaBuffer, {
+  format: 'RGBA',          // Pixel format
+  codedWidth: 1920,
+  codedHeight: 1080,
+  timestamp: 0,            // Microseconds
+  duration: 33333,         // Microseconds (optional)
+});
+```
+
+**Supported Pixel Formats:**
+- 'RGBA', 'RGBX', 'BGRA', 'BGRX'
+- 'I420', 'I420A', 'I422', 'I444'
+- 'NV12'
+
+**Properties:**
+- `codedWidth: number` - Frame width
+- `codedHeight: number` - Frame height
+- `displayWidth: number` - Display width
+- `displayHeight: number` - Display height
+- `timestamp: number` - Timestamp in microseconds
+- `duration: number | null` - Duration in microseconds
+- `format: VideoPixelFormat | null` - Pixel format
+
+**Methods:**
+
+**allocationSize(options?: VideoFrameCopyToOptions): number**
+Returns number of bytes needed to copy frame data.
+
+**copyTo(destination: BufferSource, options?: VideoFrameCopyToOptions): Promise<PlaneLayout[]>**
+Copies frame data to buffer.
+
+```javascript
+const size = frame.allocationSize();
+const buffer = new Uint8Array(size);
+const layout = await frame.copyTo(buffer);
+```
+
+**clone(): VideoFrame**
+Creates a copy of the frame.
+
+**close(): void**
+**IMPORTANT:** Must be called to free memory. Failure to close frames causes memory leaks.
+
+```javascript
+const frame = new VideoFrame(data, { ... });
+encoder.encode(frame);
+frame.close();  // Always close after use
+```
+
+### 4.7 AudioData
+
+**Constructor:**
+```typescript
+new AudioData(init: AudioDataInit)
+```
+
+```javascript
+const audio = new AudioData({
+  format: 'f32',              // Sample format
+  sampleRate: 48000,
+  numberOfFrames: 1024,
+  numberOfChannels: 2,
+  timestamp: 0,               // Microseconds
+  data: audioBuffer,          // Float32Array or other typed array
+});
+```
+
+**Supported Sample Formats:**
+- 'u8' - Unsigned 8-bit
+- 's16' - Signed 16-bit
+- 's32' - Signed 32-bit
+- 'f32' - Float 32-bit
+
+**Properties:**
+- `sampleRate: number`
+- `numberOfFrames: number`
+- `numberOfChannels: number`
+- `format: AudioSampleFormat`
+- `timestamp: number` - Microseconds
+- `duration: number` - Microseconds
+
+**Methods:**
+
+**allocationSize(options?: AudioDataCopyToOptions): number**
+Returns bytes needed for copy.
+
+**copyTo(destination: BufferSource, options?: AudioDataCopyToOptions): void**
+Copies audio data.
+
+**clone(): AudioData**
+Creates a copy.
+
+**close(): void**
+Frees memory. Must be called.
+
+### 4.8 EncodedVideoChunk & EncodedAudioChunk
+
+**Constructor:**
+```typescript
+new EncodedVideoChunk(init: EncodedVideoChunkInit)
+```
+
+```javascript
+const chunk = new EncodedVideoChunk({
+  type: 'key',           // 'key' | 'delta'
+  timestamp: 0,          // Microseconds
+  duration: 33333,       // Microseconds (optional)
+  data: encodedData,     // ArrayBuffer or Uint8Array
+});
+```
+
+**Properties:**
+- `type: 'key' | 'delta'` - Chunk type
+- `timestamp: number` - Microseconds
+- `duration: number | undefined` - Microseconds
+- `byteLength: number` - Data size
+
+**Methods:**
+
+**copyTo(destination: BufferSource): void**
+Copies chunk data to buffer.
+
+```javascript
+const buffer = new Uint8Array(chunk.byteLength);
+chunk.copyTo(buffer);
+```
+
+---
+
+## 5. Codec Information
+
+### 5.1 Video Codecs
+
+| Codec String | Description | Software Encoder | Hardware Encoder | Software Decoder | Hardware Decoder |
+|--------------|-------------|------------------|------------------|------------------|------------------|
+| `avc1.42E01E` | H.264 Baseline L3.0 | libx264 | VideoToolbox, NVENC, QSV | h264 | VideoToolbox, NVENC, QSV |
+| `avc1.4D401E` | H.264 Main L3.0 | libx264 | VideoToolbox, NVENC, QSV | h264 | VideoToolbox, NVENC, QSV |
+| `avc1.64001F` | H.264 High L3.1 | libx264 | VideoToolbox, NVENC, QSV | h264 | VideoToolbox, NVENC, QSV |
+| `hvc1`, `hev1` | H.265/HEVC | libx265 | VideoToolbox, NVENC, QSV | hevc | VideoToolbox, NVENC, QSV |
+| `vp8` | VP8 | libvpx | - | libvpx-vp8 | - |
+| `vp09.00.10.08` | VP9 Profile 0 | libvpx-vp9 | VAAPI, QSV | libvpx-vp9 | VAAPI, QSV |
+| `av01.0.05M.08` | AV1 | libsvtav1 | NVENC (RTX 40+), QSV | libaom-av1 | NVENC, QSV |
+
+**H.264 Codec String Format:**
+`avc1.PPCCLL` where:
+- PP = Profile (42=Baseline, 4D=Main, 64=High)
+- CC = Constraint flags
+- LL = Level (1E=3.0, 1F=3.1, 28=4.0, 29=4.1, etc.)
+
+**VP9 Codec String Format:**
+`vp09.PP.LL.DD.CC.CP.TC.MC.FFF` where:
+- PP = Profile (00, 01, 02, 03)
+- LL = Level
+- DD = Bit depth (08, 10, 12)
+- Additional optional parameters
+
+### 5.2 Audio Codecs
+
+| Codec String | Description | Encoder | Decoder | Typical Bitrate |
+|--------------|-------------|---------|---------|-----------------|
+| `mp4a.40.2` | AAC-LC | aac | aac | 128-256 kbps |
+| `opus` | Opus | libopus | opus | 64-128 kbps |
+| `flac` | FLAC (lossless) | flac | flac | Variable |
+| `mp3` | MP3 | libmp3lame | mp3 | 128-320 kbps |
+
+### 5.3 Hardware Acceleration
+
+**Platform-Specific Accelerators:**
+
+| Platform | Accelerator | H.264 Enc | H.264 Dec | HEVC Enc | HEVC Dec | VP9 Enc | AV1 Enc |
+|----------|-------------|-----------|-----------|----------|----------|---------|---------|
+| macOS | VideoToolbox | ✓ | ✓ | ✓ | ✓ | - | - |
+| Windows/Linux | NVIDIA NVENC | ✓ | ✓ | ✓ | ✓ | - | ✓ (RTX 40+) |
+| Windows/Linux | Intel QuickSync | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Linux | VA-API | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+**Hardware Acceleration Configuration:**
+
+```javascript
+encoder.configure({
+  codec: 'avc1.64001F',
+  width: 1920,
+  height: 1080,
+  bitrate: 5_000_000,
+  hardwareAcceleration: 'prefer-hardware',  // Options below
+});
+```
+
+**hardwareAcceleration options:**
+- `'no-preference'` (default) - Let FFmpeg choose
+- `'prefer-hardware'` - Use hardware if available, fallback to software
+- `'prefer-software'` - Use software encoder
+
+**Checking Hardware Usage:**
+
+Hardware encoders typically report themselves in metadata or logs. You can also check encoder selection:
+
+```javascript
+const { listCodecs, hasCodec } = require('node-webcodecs');
+
+// Check if hardware encoder is available
+const hasH264Nvenc = hasCodec('h264_nvenc', 'encoder');
+const hasH264VideoToolbox = hasCodec('h264_videotoolbox', 'encoder');
+```
+
+---
+
+## 6. Advanced Features
+
+### 6.1 HDR Encoding
+
+Encode HDR video with BT.2020 color space and PQ (HDR10) transfer function:
+
+```javascript
+const { VideoEncoder, VideoFrame } = require('node-webcodecs');
+
+async function encodeHDR() {
+  const encoder = new VideoEncoder({
+    output: (chunk) => {
+      // Save HDR chunk...
+    },
+    error: (err) => console.error(err),
+  });
+
+  // Configure for HDR10 encoding
+  encoder.configure({
+    codec: 'hvc1',  // HEVC recommended for HDR
+    width: 3840,
+    height: 2160,
+    bitrate: 20_000_000,  // Higher bitrate for 4K HDR
+    colorSpace: {
+      primaries: 'bt2020',        // Wide color gamut
+      transfer: 'pq',              // Perceptual Quantizer (HDR10)
+      matrix: 'bt2020-ncl',        // BT.2020 non-constant luminance
+      fullRange: false,            // Limited range (16-235)
+    },
+  });
+
+  // Create HDR frame (with BT.2020 color values)
+  const frame = new VideoFrame(hdrBuffer, {
+    format: 'I420',
+    codedWidth: 3840,
+    codedHeight: 2160,
+    timestamp: 0,
+    colorSpace: {
+      primaries: 'bt2020',
+      transfer: 'pq',
+      matrix: 'bt2020-ncl',
+    },
+  });
+
+  encoder.encode(frame, { keyFrame: true });
+  frame.close();
+
+  await encoder.flush();
+  encoder.close();
+}
+```
+
+**HLG (Hybrid Log-Gamma) Alternative:**
+
+```javascript
+encoder.configure({
+  codec: 'hvc1',
+  width: 3840,
+  height: 2160,
+  bitrate: 20_000_000,
+  colorSpace: {
+    primaries: 'bt2020',
+    transfer: 'hlg',       // HLG instead of PQ
+    matrix: 'bt2020-ncl',
+    fullRange: false,
+  },
+});
+```
+
+### 6.2 Alpha Channel Support
+
+Encode video with transparency using VP8 or VP9:
+
+```javascript
+const { VideoEncoder, VideoFrame } = require('node-webcodecs');
+
+async function encodeWithAlpha() {
+  const encoder = new VideoEncoder({
+    output: (chunk) => {
+      // Save chunk with alpha...
+    },
+    error: (err) => console.error(err),
+  });
+
+  // Configure for alpha channel encoding
+  encoder.configure({
+    codec: 'vp09.00.10.08',  // VP9 supports alpha
+    width: 1280,
+    height: 720,
+    bitrate: 2_000_000,
+    alpha: 'keep',            // Keep alpha channel (default: 'discard')
+  });
+
+  // Create RGBA frame with transparency
+  const data = new Uint8Array(1280 * 720 * 4);
+
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = 255;      // R
+    data[i + 1] = 0;    // G
+    data[i + 2] = 0;    // B
+    data[i + 3] = 128;  // A (50% transparent)
+  }
+
+  const frame = new VideoFrame(data, {
+    format: 'RGBA',
+    codedWidth: 1280,
+    codedHeight: 720,
+    timestamp: 0,
+  });
+
+  encoder.encode(frame, { keyFrame: true });
+  frame.close();
+
+  await encoder.flush();
+  encoder.close();
+}
+```
+
+**VP8 with Alpha:**
+
+```javascript
+encoder.configure({
+  codec: 'vp8',
+  width: 1280,
+  height: 720,
+  bitrate: 2_000_000,
+  alpha: 'keep',
+});
+```
+
+### 6.3 Scalability Modes (SVC)
+
+Temporal layer encoding for adaptive bitrate streaming:
+
+```javascript
+const { VideoEncoder, VideoFrame } = require('node-webcodecs');
+
+async function encodeSVC() {
+  const encoder = new VideoEncoder({
+    output: (chunk, metadata) => {
+      // Check temporal layer ID
+      if (metadata?.svc?.temporalLayerId !== undefined) {
+        console.log(`Layer ${metadata.svc.temporalLayerId}: ${chunk.byteLength} bytes`);
+      }
+      // Save chunk with layer metadata...
+    },
+    error: (err) => console.error(err),
+  });
+
+  // Configure for 2 temporal layers
+  encoder.configure({
+    codec: 'vp09.00.10.08',
+    width: 1280,
+    height: 720,
+    bitrate: 2_000_000,
+    scalabilityMode: 'L1T2',  // 1 spatial, 2 temporal layers
+  });
+
+  // Encode frames - encoder handles layer assignment
+  for (let i = 0; i < 60; i++) {
+    const frame = createFrame(i);
+    encoder.encode(frame);
+    frame.close();
+  }
+
+  await encoder.flush();
+  encoder.close();
+}
+```
+
+**Scalability Mode Formats:**
+- `L1T1` - 1 spatial, 1 temporal layer (default)
+- `L1T2` - 1 spatial, 2 temporal layers (base + enhancement)
+- `L1T3` - 1 spatial, 3 temporal layers
+
+**Use Cases:**
+- Adaptive bitrate streaming
+- Dropping frames for lower bandwidth
+- SVC-compatible streaming protocols
+
+### 6.4 Latency & Bitrate Modes
+
+**Latency Mode:**
+
+```javascript
+// Low-latency real-time encoding
+encoder.configure({
+  codec: 'avc1.42E01E',
+  width: 1280,
+  height: 720,
+  bitrate: 2_000_000,
+  latencyMode: 'realtime',  // Minimize encoding latency
+  bitrateMode: 'constant',   // CBR for predictable bitrate
+});
+```
+
+**latencyMode options:**
+- `'quality'` (default) - Optimize for quality, higher latency
+- `'realtime'` - Minimize latency for live streaming/WebRTC
+
+**Bitrate Mode:**
+
+```javascript
+// Constant bitrate for streaming
+encoder.configure({
+  codec: 'avc1.42E01E',
+  width: 1920,
+  height: 1080,
+  bitrate: 5_000_000,
+  bitrateMode: 'constant',  // CBR
+});
+```
+
+**bitrateMode options:**
+- `'constant'` - Constant bitrate (CBR) - consistent output size
+- `'variable'` (default) - Variable bitrate (VBR) - better quality
+- `'quantizer'` - Constant quality (CQP) - fixed QP value
+
+**When to Use Each:**
+
+| Mode | Use Case | Pros | Cons |
+|------|----------|------|------|
+| CBR (`constant`) | Live streaming, WebRTC | Predictable bandwidth | Lower quality in complex scenes |
+| VBR (`variable`) | File storage, VOD | Better quality | Unpredictable size |
+| CQP (`quantizer`) | Archival, high quality | Consistent quality | Very large files |
+
+### 6.5 Async Worker Threads
+
+By default, encoding and decoding run on worker threads to avoid blocking the event loop:
+
+```javascript
+// Async mode (default) - non-blocking
+encoder.configure({
+  codec: 'avc1.42E01E',
+  width: 1920,
+  height: 1080,
+  bitrate: 5_000_000,
+  useWorkerThread: true,  // default
+});
+
+// Your HTTP server stays responsive during encoding
+```
+
+**Benchmark Results:**
+
+With async mode (useWorkerThread: true):
+- Event loop remains responsive
+- 3100% more event loop iterations during encoding
+- HTTP servers and timers continue working
+- Recommended for production
+
+With sync mode (useWorkerThread: false):
+- Event loop blocks during encoding
+- Useful for debugging or single-threaded workloads
+- Not recommended for servers
+
+**Disable Async (Sync Mode):**
+
+```javascript
+encoder.configure({
+  codec: 'avc1.42E01E',
+  width: 1920,
+  height: 1080,
+  useWorkerThread: false,  // Blocks event loop
+});
+```
+
+---
+
+## 7. Complete Working Examples
+
+### Example 1: Basic Video Encoding
+
+```javascript
+const { VideoEncoder, VideoFrame } = require('node-webcodecs');
+
+async function basicVideoEncode() {
+  const encodedChunks = [];
+
+  const encoder = new VideoEncoder({
+    output: (chunk, metadata) => {
+      encodedChunks.push(chunk);
+      if (metadata?.decoderConfig) {
+        console.log('Got decoder config');
+      }
+    },
+    error: (err) => console.error('Error:', err),
+  });
+
+  encoder.configure({
+    codec: 'avc1.42E01E',
+    width: 640,
+    height: 480,
+    bitrate: 1_000_000,
+    framerate: 30,
+  });
+
+  // Generate 30 frames
+  for (let i = 0; i < 30; i++) {
+    const data = new Uint8Array(640 * 480 * 4);
+    const brightness = 50 + i * 5;
+
+    for (let j = 0; j < data.length; j += 4) {
+      data[j] = brightness;
+      data[j + 1] = brightness;
+      data[j + 2] = brightness;
+      data[j + 3] = 255;
+    }
+
+    const frame = new VideoFrame(data, {
+      format: 'RGBA',
+      codedWidth: 640,
+      codedHeight: 480,
+      timestamp: i * 33333,
+    });
+
+    encoder.encode(frame, { keyFrame: i === 0 });
+    frame.close();
+  }
+
+  await encoder.flush();
+  encoder.close();
+
+  return encodedChunks;
+}
+
+basicVideoEncode().catch(console.error);
+```
+
+### Example 2: Encode-Decode Roundtrip
+
+```javascript
+const { VideoEncoder, VideoDecoder, VideoFrame, EncodedVideoChunk } = require('node-webcodecs');
+
+async function roundtrip() {
+  const encodedChunks = [];
+  let decoderConfig = null;
+
+  // Encode
+  const encoder = new VideoEncoder({
+    output: (chunk, metadata) => {
+      encodedChunks.push(chunk);
+      if (metadata?.decoderConfig) {
+        decoderConfig = metadata.decoderConfig;
+      }
+    },
+    error: (err) => console.error('Encode error:', err),
+  });
+
+  encoder.configure({
+    codec: 'avc1.42E01E',
+    width: 320,
+    height: 240,
+    bitrate: 500000,
+  });
+
+  // Create colored frames
+  const colors = [
+    { r: 255, g: 0, b: 0 },
+    { r: 0, g: 255, b: 0 },
+    { r: 0, g: 0, b: 255 },
+  ];
+
+  for (let i = 0; i < colors.length; i++) {
+    const data = new Uint8Array(320 * 240 * 4);
+    const { r, g, b } = colors[i];
+
+    for (let j = 0; j < data.length; j += 4) {
+      data[j] = r;
+      data[j + 1] = g;
+      data[j + 2] = b;
+      data[j + 3] = 255;
+    }
+
+    const frame = new VideoFrame(data, {
+      format: 'RGBA',
+      codedWidth: 320,
+      codedHeight: 240,
+      timestamp: i * 33333,
+    });
+
+    encoder.encode(frame, { keyFrame: i === 0 });
+    frame.close();
+  }
+
+  await encoder.flush();
+  encoder.close();
+
+  console.log(`Encoded ${encodedChunks.length} chunks`);
+
+  // Decode
+  const decodedFrames = [];
+  const decoder = new VideoDecoder({
+    output: (frame) => {
+      decodedFrames.push(frame);
+      console.log(`Decoded frame @ ${frame.timestamp}µs`);
+    },
+    error: (err) => console.error('Decode error:', err),
+  });
+
+  decoder.configure({
+    codec: decoderConfig.codec,
+    codedWidth: decoderConfig.codedWidth,
+    codedHeight: decoderConfig.codedHeight,
+    description: decoderConfig.description,
+  });
+
+  for (const chunk of encodedChunks) {
+    decoder.decode(chunk);
+  }
+
+  await decoder.flush();
+  decoder.close();
+
+  console.log(`Decoded ${decodedFrames.length} frames`);
+
+  // Clean up
+  decodedFrames.forEach(f => f.close());
+}
+
+roundtrip().catch(console.error);
+```
+
+### Example 3: Audio Encoding (AAC)
+
+```javascript
+const { AudioEncoder, AudioData } = require('node-webcodecs');
+
+async function encodeAudio() {
+  const encodedChunks = [];
+
+  const encoder = new AudioEncoder({
+    output: (chunk) => {
+      encodedChunks.push(chunk);
+      console.log(`Encoded: ${chunk.byteLength} bytes`);
+    },
+    error: (err) => console.error(err),
+  });
+
+  encoder.configure({
+    codec: 'mp4a.40.2',
+    sampleRate: 48000,
+    numberOfChannels: 2,
+    bitrate: 128000,
+  });
+
+  // Generate 1 second of 440Hz tone
+  const sampleRate = 48000;
+  const frequency = 440;
+  const numSamples = sampleRate;
+  const numChannels = 2;
+
+  const audioBuffer = new Float32Array(numSamples * numChannels);
+
+  for (let i = 0; i < numSamples; i++) {
+    const t = i / sampleRate;
+    const sample = Math.sin(2 * Math.PI * frequency * t) * 0.5;
+    audioBuffer[i * 2] = sample;
+    audioBuffer[i * 2 + 1] = sample;
+  }
+
+  const audio = new AudioData({
+    format: 'f32',
+    sampleRate: sampleRate,
+    numberOfFrames: numSamples,
+    numberOfChannels: numChannels,
+    timestamp: 0,
+    data: audioBuffer,
+  });
+
+  encoder.encode(audio);
+  audio.close();
+
+  await encoder.flush();
+  encoder.close();
+
+  console.log(`Total: ${encodedChunks.length} chunks`);
+  return encodedChunks;
+}
+
+encodeAudio().catch(console.error);
+```
+
+### Example 4: Image Decoding (JPEG)
+
+```javascript
+const { ImageDecoder } = require('node-webcodecs');
+const fs = require('fs');
+
+async function decodeJPEG(filePath) {
+  const imageData = fs.readFileSync(filePath);
+
+  const decoder = new ImageDecoder({
+    data: imageData,
+    type: 'image/jpeg',
+  });
+
+  await decoder.completed;
+
+  console.log('Type:', decoder.type);
+  console.log('Frames:', decoder.tracks.selectedTrack.frameCount);
+
+  const result = await decoder.decode({ frameIndex: 0 });
+  const frame = result.image;
+
+  console.log(`Decoded: ${frame.codedWidth}x${frame.codedHeight}`);
+
+  // Extract pixel data
+  const size = frame.allocationSize();
+  const buffer = new Uint8Array(size);
+  await frame.copyTo(buffer);
+
+  console.log(`Pixel data: ${buffer.length} bytes`);
+
+  frame.close();
+  decoder.close();
+}
+
+decodeJPEG('photo.jpg').catch(console.error);
+```
+
+### Example 5: HDR Video Encoding
+
+```javascript
+const { VideoEncoder, VideoFrame } = require('node-webcodecs');
+
+async function encodeHDR() {
+  const encoder = new VideoEncoder({
+    output: (chunk) => {
+      console.log(`HDR chunk: ${chunk.byteLength} bytes`);
+    },
+    error: (err) => console.error(err),
+  });
+
+  encoder.configure({
+    codec: 'hvc1',
+    width: 3840,
+    height: 2160,
+    bitrate: 20_000_000,
+    colorSpace: {
+      primaries: 'bt2020',
+      transfer: 'pq',
+      matrix: 'bt2020-ncl',
+      fullRange: false,
+    },
+  });
+
+  // Create HDR frame (simplified - normally from HDR source)
+  const data = new Uint8Array(3840 * 2160 * 4);
+  // Fill with HDR values...
+
+  const frame = new VideoFrame(data, {
+    format: 'RGBA',
+    codedWidth: 3840,
+    codedHeight: 2160,
+    timestamp: 0,
+  });
+
+  encoder.encode(frame, { keyFrame: true });
+  frame.close();
+
+  await encoder.flush();
+  encoder.close();
+}
+
+encodeHDR().catch(console.error);
+```
+
+### Example 6: VP9 with Alpha Channel
+
+```javascript
+const { VideoEncoder, VideoFrame } = require('node-webcodecs');
+
+async function encodeVP9Alpha() {
+  const encoder = new VideoEncoder({
+    output: (chunk) => {
+      console.log(`VP9 alpha chunk: ${chunk.byteLength} bytes`);
+    },
+    error: (err) => console.error(err),
+  });
+
+  encoder.configure({
+    codec: 'vp09.00.10.08',
+    width: 1280,
+    height: 720,
+    bitrate: 2_000_000,
+    alpha: 'keep',
+  });
+
+  // Create RGBA frame with transparency
+  const data = new Uint8Array(1280 * 720 * 4);
+
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = 255;      // R
+    data[i + 1] = 0;    // G
+    data[i + 2] = 0;    // B
+    data[i + 3] = 128;  // A (50% transparent)
+  }
+
+  const frame = new VideoFrame(data, {
+    format: 'RGBA',
+    codedWidth: 1280,
+    codedHeight: 720,
+    timestamp: 0,
+  });
+
+  encoder.encode(frame, { keyFrame: true });
+  frame.close();
+
+  await encoder.flush();
+  encoder.close();
+}
+
+encodeVP9Alpha().catch(console.error);
+```
+
+### Example 7: Real-time Low-Latency Encoding
+
+```javascript
+const { VideoEncoder, VideoFrame } = require('node-webcodecs');
+
+async function realtimeEncode() {
+  const encoder = new VideoEncoder({
+    output: (chunk) => {
+      // Send chunk over network immediately
+      console.log(`Realtime chunk: ${chunk.byteLength} bytes, type: ${chunk.type}`);
+    },
+    error: (err) => console.error(err),
+  });
+
+  encoder.configure({
+    codec: 'avc1.42E01E',
+    width: 1280,
+    height: 720,
+    bitrate: 2_000_000,
+    framerate: 30,
+    latencyMode: 'realtime',
+    bitrateMode: 'constant',
+    hardwareAcceleration: 'prefer-hardware',
+  });
+
+  // Simulate live frames
+  for (let i = 0; i < 100; i++) {
+    const data = new Uint8Array(1280 * 720 * 4);
+    // Fill with live camera/screen data...
+
+    const frame = new VideoFrame(data, {
+      format: 'RGBA',
+      codedWidth: 1280,
+      codedHeight: 720,
+      timestamp: i * 33333,
+    });
+
+    encoder.encode(frame, { keyFrame: i % 30 === 0 });
+    frame.close();
+
+    // Wait for next frame (simulated)
+    await new Promise(resolve => setTimeout(resolve, 33));
+  }
+
+  await encoder.flush();
+  encoder.close();
+}
+
+realtimeEncode().catch(console.error);
+```
+
+### Example 8: Hardware Accelerated Encoding
+
+```javascript
+const { VideoEncoder, VideoFrame, hasCodec } = require('node-webcodecs');
+
+async function hardwareEncode() {
+  // Check hardware encoder availability
+  const hasNVENC = hasCodec('h264_nvenc', 'encoder');
+  const hasVideoToolbox = hasCodec('h264_videotoolbox', 'encoder');
+  const hasQSV = hasCodec('h264_qsv', 'encoder');
+
+  console.log('Hardware encoders:');
+  console.log('  NVENC:', hasNVENC);
+  console.log('  VideoToolbox:', hasVideoToolbox);
+  console.log('  QuickSync:', hasQSV);
+
+  const encoder = new VideoEncoder({
+    output: (chunk) => {
+      console.log(`HW encoded: ${chunk.byteLength} bytes`);
+    },
+    error: (err) => console.error(err),
+  });
+
+  encoder.configure({
+    codec: 'avc1.64001F',
+    width: 1920,
+    height: 1080,
+    bitrate: 5_000_000,
+    framerate: 60,
+    hardwareAcceleration: 'prefer-hardware',
+  });
+
+  // Encode frames...
+  for (let i = 0; i < 60; i++) {
+    const data = new Uint8Array(1920 * 1080 * 4);
+    // Fill data...
+
+    const frame = new VideoFrame(data, {
+      format: 'RGBA',
+      codedWidth: 1920,
+      codedHeight: 1080,
+      timestamp: i * 16667,
+    });
+
+    encoder.encode(frame, { keyFrame: i === 0 });
+    frame.close();
+  }
+
+  await encoder.flush();
+  encoder.close();
+}
+
+hardwareEncode().catch(console.error);
+```
+
+### Example 9: Scalability Mode (SVC)
+
+```javascript
+const { VideoEncoder, VideoFrame } = require('node-webcodecs');
+
+async function encodeSVC() {
+  const encoder = new VideoEncoder({
+    output: (chunk, metadata) => {
+      if (metadata?.svc?.temporalLayerId !== undefined) {
+        console.log(`Layer ${metadata.svc.temporalLayerId}: ${chunk.type} ${chunk.byteLength}b`);
+      }
+    },
+    error: (err) => console.error(err),
+  });
+
+  encoder.configure({
+    codec: 'vp09.00.10.08',
+    width: 1280,
+    height: 720,
+    bitrate: 2_000_000,
+    scalabilityMode: 'L1T2',  // 2 temporal layers
+  });
+
+  for (let i = 0; i < 60; i++) {
+    const data = new Uint8Array(1280 * 720 * 4);
+    // Fill data...
+
+    const frame = new VideoFrame(data, {
+      format: 'RGBA',
+      codedWidth: 1280,
+      codedHeight: 720,
+      timestamp: i * 33333,
+    });
+
+    encoder.encode(frame);
+    frame.close();
+  }
+
+  await encoder.flush();
+  encoder.close();
+}
+
+encodeSVC().catch(console.error);
+```
+
+### Example 10: Backpressure Handling
+
+```javascript
+const { VideoEncoder, VideoFrame } = require('node-webcodecs');
+
+async function encodeWithBackpressure() {
+  const encoder = new VideoEncoder({
+    output: (chunk) => {
+      console.log(`Chunk: ${chunk.byteLength} bytes`);
+    },
+    error: (err) => console.error(err),
+  });
+
+  encoder.configure({
+    codec: 'avc1.42E01E',
+    width: 1920,
+    height: 1080,
+    bitrate: 5_000_000,
+  });
+
+  // Handle backpressure
+  async function encodeFrame(frame) {
+    // Wait if queue is full
+    while (encoder.encodeQueueSize > 10) {
+      await new Promise(resolve => {
+        encoder.addEventListener('dequeue', resolve, { once: true });
+      });
+    }
+
+    encoder.encode(frame);
+  }
+
+  // Encode many frames
+  for (let i = 0; i < 1000; i++) {
+    const data = new Uint8Array(1920 * 1080 * 4);
+    // Fill data...
+
+    const frame = new VideoFrame(data, {
+      format: 'RGBA',
+      codedWidth: 1920,
+      codedHeight: 1080,
+      timestamp: i * 33333,
+    });
+
+    await encodeFrame(frame);
+    frame.close();
+
+    console.log(`Queue size: ${encoder.encodeQueueSize}`);
+  }
+
+  await encoder.flush();
+  encoder.close();
+}
+
+encodeWithBackpressure().catch(console.error);
+```
+
+---
+
+## 8. Configuration Reference
+
+### VideoEncoderConfig
+
+Complete reference for all configuration options:
+
+**codec: string** (required)
+Codec identifier string. Format varies by codec:
+- H.264: `avc1.PPCCLL` (e.g., `avc1.42E01E`, `avc1.64001F`)
+- HEVC: `hvc1` or `hev1`
+- VP8: `vp8`
+- VP9: `vp09.PP.LL.DD` (e.g., `vp09.00.10.08`)
+- AV1: `av01.P.LLT.DD` (e.g., `av01.0.05M.08`)
+
+**width: number** (required)
+Frame width in pixels. Must be > 0. Typically even number.
+
+**height: number** (required)
+Frame height in pixels. Must be > 0. Typically even number.
+
+**displayWidth: number** (optional)
+Display width for non-square pixels. Defaults to width.
+
+**displayHeight: number** (optional)
+Display height for non-square pixels. Defaults to height.
+
+**bitrate: number** (optional)
+Target bitrate in bits per second.
+- Recommended: 1-5 Mbps for 1080p, 5-20 Mbps for 4K
+- Higher = better quality, larger files
+
+**framerate: number** (optional)
+Frame rate in frames per second.
+- Common values: 24, 25, 30, 60
+- Higher = smoother motion, higher bitrate needed
+
+**hardwareAcceleration: string** (optional)
+Hardware acceleration preference:
+- `'no-preference'` (default) - Let FFmpeg choose
+- `'prefer-hardware'` - Use HW if available
+- `'prefer-software'` - Force software encoder
+
+**alpha: AlphaOption** (optional)
+Alpha channel handling:
+- `'discard'` (default) - Remove alpha channel
+- `'keep'` - Preserve alpha (VP8/VP9 only)
+
+**scalabilityMode: string** (optional)
+Temporal layer SVC mode:
+- `'L1T1'` (default) - Single layer
+- `'L1T2'` - 2 temporal layers
+- `'L1T3'` - 3 temporal layers
+
+**bitrateMode: BitrateMode** (optional)
+Bitrate control mode:
+- `'constant'` - CBR, constant bitrate
+- `'variable'` (default) - VBR, variable bitrate
+- `'quantizer'` - CQP, constant quality
+
+**latencyMode: LatencyMode** (optional)
+Encoding latency preference:
+- `'quality'` (default) - Optimize quality
+- `'realtime'` - Minimize latency for live streaming
+
+**colorSpace: VideoColorSpaceInit** (optional)
+Color space configuration:
+```javascript
+{
+  primaries: 'bt709' | 'bt470bg' | 'smpte170m' | 'bt2020' | 'smpte432',
+  transfer: 'bt709' | 'smpte170m' | 'iec61966-2-1' | 'linear' | 'pq' | 'hlg',
+  matrix: 'rgb' | 'bt709' | 'bt470bg' | 'smpte170m' | 'bt2020-ncl',
+  fullRange: boolean,  // true = 0-255, false = 16-235
+}
+```
+
+**avc: object** (optional)
+H.264 specific options:
+```javascript
+{
+  format: 'annexb' | 'avc',  // Annex B or AVC format
+}
+```
+
+**useWorkerThread: boolean** (optional)
+Use async worker thread encoding:
+- `true` (default) - Non-blocking, recommended
+- `false` - Blocking, sync mode
+
+### VideoDecoderConfig
+
+**codec: string** (required)
+Codec identifier (same format as encoder).
+
+**codedWidth: number** (required)
+Coded frame width in pixels.
+
+**codedHeight: number** (required)
+Coded frame height in pixels.
+
+**description: ArrayBuffer** (optional)
+Codec extradata (SPS/PPS for H.264, etc.).
+Typically obtained from encoder metadata.
+
+**hardwareAcceleration: string** (optional)
+Same as encoder: `'no-preference'`, `'prefer-hardware'`, `'prefer-software'`.
+
+**useWorkerThread: boolean** (optional)
+Use async worker thread decoding (default: true).
+
+### AudioEncoderConfig
+
+**codec: string** (required)
+Audio codec identifier:
+- `'mp4a.40.2'` - AAC-LC
+- `'opus'` - Opus
+- `'flac'` - FLAC
+- `'mp3'` - MP3
+
+**sampleRate: number** (required)
+Sample rate in Hz. Common values:
+- 8000, 16000, 22050, 44100, 48000
+
+**numberOfChannels: number** (required)
+Number of audio channels:
+- 1 = Mono
+- 2 = Stereo
+- 6 = 5.1 surround
+
+**bitrate: number** (optional)
+Target bitrate in bits per second.
+- AAC: 64000-256000
+- Opus: 24000-128000
+- MP3: 128000-320000
+
+### AudioDecoderConfig
+
+**codec: string** (required)
+Audio codec identifier.
+
+**sampleRate: number** (required)
+Sample rate in Hz.
+
+**numberOfChannels: number** (required)
+Number of channels.
+
+**description: ArrayBuffer** (optional)
+Codec-specific configuration data.
+
+---
+
+## 9. Real-World Use Cases
+
+### Use Case 1: Isomorphic Video Editors
+
+**Who:** Kapwing, Veed.io, Canva Video, Descript
+
+**Problem:**
+Browser preview uses WebCodecs. Server export uses FFmpeg CLI. Two codepaths mean:
+- Different rendering bugs between preview and export
+- Visual parity issues
+- Double maintenance burden
+- User confusion when export doesn't match preview
+
+**Solution with node-webcodecs:**
+Same effects code runs in browser AND server. Visual parity guaranteed.
+
+```javascript
+// effects/textOverlay.js
+// This EXACT code runs in browser AND server
+
+export function applyTextOverlay(frame, config) {
+  // Extract frame to canvas/ImageData
+  const imageData = extractImageData(frame);
+  const canvas = createCanvas(frame.codedWidth, frame.codedHeight);
+  const ctx = canvas.getContext('2d');
+
+  ctx.putImageData(imageData, 0, 0);
+  ctx.font = config.font;
+  ctx.fillStyle = config.color;
+  ctx.fillText(config.text, config.x, config.y);
+
+  // Create new frame with modified data
+  const newImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  return new VideoFrame(newImageData.data, {
+    format: 'RGBA',
+    codedWidth: frame.codedWidth,
+    codedHeight: frame.codedHeight,
+    timestamp: frame.timestamp,
+  });
+}
+
+// Browser usage:
+const frame = await decoder.decode(chunk);
+const processed = applyTextOverlay(frame, { text: 'Hello', ... });
+encoder.encode(processed);
+
+// Server usage (identical API):
+const frame = await decoder.decode(chunk);
+const processed = applyTextOverlay(frame, { text: 'Hello', ... });
+encoder.encode(processed);
+```
+
+### Use Case 2: WebRTC Real-Time Composition
+
+**Who:** Riverside.fm, Streamyard, Squadcast
+
+**Problem:**
+Recording multi-party calls with custom layouts requires:
+- Screen capture (lossy compression)
+- Separate native pipeline (complex integration)
+- Neither integrates with existing Node WebRTC server
+
+**Solution with node-webcodecs:**
+Decode, composite, re-encode in same Node process handling signaling.
+
+```javascript
+// In your Mediasoup/WebRTC server
+const { VideoDecoder, VideoEncoder, VideoFrame } = require('node-webcodecs');
+
+const participants = new Map();
+const frames = new Map();
+
+// Create decoder for each participant
+for (const participant of conference.participants) {
+  const decoder = new VideoDecoder({
+    output: (frame) => {
+      frames.set(participant.id, frame);
+      // Trigger composition when all frames ready
+      if (frames.size === participants.size) {
+        composeAndEncode();
+      }
+    },
+    error: (err) => console.error(`Decoder ${participant.id}:`, err),
+  });
+
+  decoder.configure({
+    codec: 'vp09.00.10.08',
+    codedWidth: 1280,
+    codedHeight: 720,
+  });
+
+  participants.set(participant.id, decoder);
+}
+
+// Composite encoder
+const composer = new VideoEncoder({
+  output: (chunk) => {
+    // Save to recording file
+    recordingFile.write(chunk);
+  },
+  error: (err) => console.error('Compose error:', err),
+});
+
+composer.configure({
+  codec: 'avc1.64001F',
+  width: 1920,
+  height: 1080,
+  bitrate: 5_000_000,
+});
+
+function composeAndEncode() {
+  // Create composite frame
+  const compositeData = new Uint8Array(1920 * 1080 * 4);
+
+  // Layout: 2x2 grid
+  const positions = [
+    { x: 0, y: 0 },
+    { x: 960, y: 0 },
+    { x: 0, y: 540 },
+    { x: 960, y: 540 },
+  ];
+
+  let i = 0;
+  for (const [id, frame] of frames) {
+    const pos = positions[i++];
+    // Copy frame pixels to composite (simplified)
+    copyFrameToPosition(frame, compositeData, pos.x, pos.y);
+    frame.close();
+  }
+
+  frames.clear();
+
+  const compositeFrame = new VideoFrame(compositeData, {
+    format: 'RGBA',
+    codedWidth: 1920,
+    codedHeight: 1080,
+    timestamp: Date.now() * 1000,
+  });
+
+  composer.encode(compositeFrame);
+  compositeFrame.close();
+}
+```
+
+### Use Case 3: Live Highlight Clipping
+
+**Who:** Twitch clippers, sports highlights, surveillance systems
+
+**Problem:**
+Current pipelines analyze streams separately from recording:
+- Timestamp handoff is lossy
+- Clips cut at keyframes, not exact moments
+- Difficult to correlate analysis with encoding
+
+**Solution with node-webcodecs:**
+Single pipeline. Analyzed frame = encoded frame. Frame-accurate clips.
+
+```javascript
+const { VideoDecoder, VideoEncoder } = require('node-webcodecs');
+
+let clipping = false;
+let clipStart = 0;
+let clipEncoder = null;
+
+// Decode live stream
+const streamDecoder = new VideoDecoder({
+  output: async (frame) => {
+    // Analyze frame for interesting events
+    const eventDetected = await detectEvent(frame);
+
+    if (eventDetected && !clipping) {
+      // Start clip
+      clipping = true;
+      clipStart = frame.timestamp;
+
+      clipEncoder = new VideoEncoder({
+        output: (chunk) => {
+          // Save clip chunk
+          saveClipChunk(chunk);
+        },
+        error: (err) => console.error(err),
+      });
+
+      clipEncoder.configure({
+        codec: 'avc1.64001F',
+        width: frame.codedWidth,
+        height: frame.codedHeight,
+        bitrate: 5_000_000,
+      });
+
+      console.log(`Clip started at ${frame.timestamp}µs`);
+    }
+
+    if (clipping) {
+      // Encode to clip
+      clipEncoder.encode(frame.clone());
+
+      // Stop after 30 seconds
+      if (frame.timestamp - clipStart > 30_000_000) {
+        await clipEncoder.flush();
+        clipEncoder.close();
+        clipping = false;
+        console.log('Clip saved');
+      }
+    }
+
+    frame.close();
+  },
+  error: (err) => console.error(err),
+});
+
+async function detectEvent(frame) {
+  // ML model, motion detection, etc.
+  // Return true if interesting moment detected
+  return false;
+}
+```
+
+### Use Case 4: Video Ingest Validation
+
+**Who:** Video platforms, DAM systems, UGC sites
+
+**Problem:**
+ffprobe gives container metadata but doesn't tell you:
+- If frames are actually decodable
+- If there are frozen segments
+- If there's visual corruption
+- Actual quality metrics
+
+**Solution with node-webcodecs:**
+Frame-by-frame validation with actual decoding.
+
+```javascript
+const { VideoDecoder } = require('node-webcodecs');
+
+async function validateVideo(filePath) {
+  let totalFrames = 0;
+  let frozenFrames = 0;
+  let blackFrames = 0;
+  let decodeErrors = 0;
+  let lastHash = null;
+
+  const decoder = new VideoDecoder({
+    output: (frame) => {
+      totalFrames++;
+
+      // Check for frozen video (identical frames)
+      const hash = perceptualHash(frame);
+      if (hash === lastHash) {
+        frozenFrames++;
+      }
+      lastHash = hash;
+
+      // Check for black frames
+      if (isBlackFrame(frame)) {
+        blackFrames++;
+      }
+
+      frame.close();
+    },
+    error: (err) => {
+      decodeErrors++;
+      console.error('Decode error:', err);
+    },
+  });
+
+  // Get video metadata and decode
+  const metadata = await probeVideo(filePath);
+
+  decoder.configure({
+    codec: metadata.codec,
+    codedWidth: metadata.width,
+    codedHeight: metadata.height,
+  });
+
+  // Decode all chunks from file
+  for await (const chunk of readVideoChunks(filePath)) {
+    decoder.decode(chunk);
+  }
+
+  await decoder.flush();
+  decoder.close();
+
+  // Validation report
+  const report = {
+    decodable: decodeErrors === 0,
+    totalFrames,
+    frozenFrames,
+    blackFrames,
+    decodeErrors,
+    frozenPercentage: (frozenFrames / totalFrames) * 100,
+    blackPercentage: (blackFrames / totalFrames) * 100,
+    valid: decodeErrors === 0 && frozenFrames < totalFrames * 0.05,
+  };
+
+  console.log('Validation report:', report);
+  return report;
+}
+
+function perceptualHash(frame) {
+  // Simple hash - sample 16x16 grid
+  const samples = 256;
+  const stride = Math.floor(frame.codedWidth * frame.codedHeight / samples);
+  let hash = 0;
+
+  // Extract and hash sampled pixels
+  // (Simplified - real implementation would use copyTo)
+
+  return hash;
+}
+
+function isBlackFrame(frame) {
+  // Check if frame is entirely black
+  // (Simplified - real implementation would sample pixels)
+  return false;
+}
+```
+
+### Use Case 5: Personalized Video Generation
+
+**Who:** Marketing automation, dynamic ads, video APIs
+
+**Problem:**
+Template-based video with dynamic content using FFmpeg CLI:
+- String-template FFmpeg commands (error-prone)
+- Conditional logic becomes unreadable filter graphs
+- Difficult to debug
+- Hard to test
+
+**Solution with node-webcodecs:**
+Actual programming. Variables, loops, conditionals. Debuggable.
+
+```javascript
+const { VideoDecoder, VideoEncoder, VideoFrame } = require('node-webcodecs');
+
+async function generatePersonalizedVideo(template, customer) {
+  const encoder = new VideoEncoder({
+    output: (chunk) => {
+      saveToFile(chunk, `video_${customer.id}.mp4`);
+    },
+    error: (err) => console.error(err),
+  });
+
+  encoder.configure({
+    codec: 'avc1.64001F',
+    width: 1920,
+    height: 1080,
+    bitrate: 5_000_000,
+  });
+
+  // Decode template video
+  for await (const frame of decodeTemplate(template)) {
+    const t = frame.timestamp / 1_000_000;  // Convert to seconds
+
+    // Actual JavaScript programming for video logic
+    if (customer.isPremium) {
+      addGoldBorder(frame);
+    }
+
+    // Different text at different times
+    if (t >= 2 && t <= 5) {
+      drawText(frame, `Welcome ${customer.name}!`, {
+        x: 100,
+        y: 100,
+        font: '48px Arial',
+        color: customer.brandColor,
+      });
+    }
+
+    if (t >= 6 && t <= 10) {
+      drawText(frame, `Your savings: $${customer.savings}`, {
+        x: 100,
+        y: 200,
+        font: '36px Arial',
+        color: '#00ff00',
+      });
+    }
+
+    // Dynamic logo placement
+    const logoX = t < 5 ? 10 : 100;
+    compositeImage(frame, customer.logo, { x: logoX, y: 10 });
+
+    // Force keyframe every 2 seconds for seekability
+    const keyFrame = Math.floor(t) % 2 === 0;
+    encoder.encode(frame, { keyFrame });
+
+    frame.close();
+  }
+
+  await encoder.flush();
+  encoder.close();
+
+  console.log(`Generated personalized video for ${customer.name}`);
+}
+
+function drawText(frame, text, style) {
+  // Extract frame, draw text, create new frame
+  // (Implementation using canvas or image library)
+}
+
+function addGoldBorder(frame) {
+  // Add decorative border for premium customers
+}
+
+function compositeImage(frame, image, position) {
+  // Overlay logo/image at position
+}
+```
+
+---
+
+## 10. Troubleshooting Guide
+
+### Installation Issues
+
+**"pkg-config not found"**
+
+Error: `pkg-config: command not found`
+
+Solution:
+```bash
+# macOS
+brew install pkg-config
+
+# Ubuntu/Debian
+sudo apt-get install pkg-config
+
+# Windows (Chocolatey)
+choco install pkgconfiglite
+```
+
+**"FFmpeg libraries not found"**
+
+Error: `Package libavcodec was not found`
+
+Solution:
+```bash
+# Verify FFmpeg is installed
+pkg-config --modversion libavcodec
+
+# If not found, install FFmpeg dev libraries
+# macOS
+brew install ffmpeg
+
+# Ubuntu/Debian
+sudo apt-get install libavcodec-dev libavutil-dev libswscale-dev libswresample-dev
+
+# Check library paths
+pkg-config --libs libavcodec
+```
+
+**Build failures on macOS**
+
+Error: `gyp: No Xcode or CLT version detected`
+
+Solution:
+```bash
+# Install Xcode Command Line Tools
+xcode-select --install
+
+# Verify installation
+xcode-select -p
+
+# Ensure Homebrew paths are in environment
+export PATH="/opt/homebrew/bin:$PATH"
+export PKG_CONFIG_PATH="/opt/homebrew/lib/pkgconfig"
+```
+
+**Build failures on Ubuntu**
+
+Error: `fatal error: libavcodec/avcodec.h: No such file or directory`
+
+Solution:
+```bash
+# Install all required dev packages
+sudo apt-get update
+sudo apt-get install build-essential pkg-config \
+  libavcodec-dev libavutil-dev libswscale-dev \
+  libswresample-dev libavformat-dev
+
+# Verify headers are present
+ls /usr/include/libavcodec/avcodec.h
+```
+
+### Codec Issues
+
+**"Codec not supported"**
+
+Error: `DOMException: Unsupported codec: avc1.42E01E`
+
+Solution:
+```javascript
+// Check if codec is supported before configuring
+const support = await VideoEncoder.isConfigSupported({
+  codec: 'avc1.42E01E',
+  width: 1920,
+  height: 1080,
+});
+
+if (!support.supported) {
+  console.error('Codec not supported');
+  // Try alternative codec
+}
+
+// List available codecs
+const { listCodecs } = require('node-webcodecs');
+const codecs = listCodecs();
+console.log('Available encoders:', codecs.encoders);
+```
+
+**Hardware acceleration not working**
+
+Check hardware encoder availability:
+```javascript
+const { hasCodec } = require('node-webcodecs');
+
+const hasHW = hasCodec('h264_videotoolbox', 'encoder')  // macOS
+  || hasCodec('h264_nvenc', 'encoder')                   // NVIDIA
+  || hasCodec('h264_qsv', 'encoder');                    // Intel
+
+if (!hasHW) {
+  console.log('No hardware encoder available, using software');
+}
+
+// Force software encoder
+encoder.configure({
+  codec: 'avc1.42E01E',
+  width: 1920,
+  height: 1080,
+  hardwareAcceleration: 'prefer-software',
+});
+```
+
+**isConfigSupported returns false**
+
+```javascript
+// Test incrementally
+const configs = [
+  { codec: 'avc1.42E01E', width: 640, height: 480 },
+  { codec: 'avc1.64001F', width: 640, height: 480 },
+  { codec: 'vp09.00.10.08', width: 640, height: 480 },
+];
+
+for (const config of configs) {
+  const support = await VideoEncoder.isConfigSupported(config);
+  console.log(config.codec, support.supported);
+}
+```
+
+### Runtime Errors
+
+**"Invalid state" errors**
+
+Error: `DOMException: Encoder is not configured`
+
+Solution:
+```javascript
+// Check state before operations
+if (encoder.state === 'unconfigured') {
+  encoder.configure({ ... });
+}
+
+if (encoder.state === 'configured') {
+  encoder.encode(frame);
+}
+
+// Don't use after close
+encoder.close();
+// encoder.encode(frame);  // Error! Encoder is closed
+```
+
+**Memory errors / crashes**
+
+Cause: Not closing frames
+
+Solution:
+```javascript
+// ALWAYS close frames
+const frame = new VideoFrame(data, { ... });
+encoder.encode(frame);
+frame.close();  // Essential!
+
+// Use try/finally to ensure cleanup
+const frame = new VideoFrame(data, { ... });
+try {
+  encoder.encode(frame);
+} finally {
+  frame.close();
+}
+
+// Close decoded frames too
+decoder = new VideoDecoder({
+  output: (frame) => {
+    // Process frame...
+    frame.close();  // Don't forget!
+  },
+  error: (err) => console.error(err),
+});
+```
+
+**Timestamp issues**
+
+Timestamps are in MICROSECONDS, not milliseconds:
+
+```javascript
+// Wrong - milliseconds
+const frame = new VideoFrame(data, {
+  format: 'RGBA',
+  codedWidth: 640,
+  codedHeight: 480,
+  timestamp: Date.now(),  // WRONG! This is milliseconds
+});
+
+// Correct - microseconds
+const frame = new VideoFrame(data, {
+  format: 'RGBA',
+  codedWidth: 640,
+  codedHeight: 480,
+  timestamp: Date.now() * 1000,  // Convert to microseconds
+});
+
+// For frame timing at 30fps
+const frameDuration = 33333;  // microseconds
+const timestamp = frameNumber * frameDuration;
+```
+
+**Queue overflow**
+
+Error: Too many pending frames
+
+Solution:
+```javascript
+// Monitor queue size
+encoder.addEventListener('dequeue', () => {
+  console.log('Queue emptied');
+});
+
+// Wait for queue to drain
+async function encodeWithBackpressure(frame) {
+  while (encoder.encodeQueueSize > 10) {
+    await new Promise(resolve => {
+      encoder.addEventListener('dequeue', resolve, { once: true });
+    });
+  }
+  encoder.encode(frame);
+}
+```
+
+### Performance Issues
+
+**Event loop blocking**
+
+Symptom: Server becomes unresponsive during encoding
+
+Solution:
+```javascript
+// Use async mode (default)
+encoder.configure({
+  codec: 'avc1.42E01E',
+  width: 1920,
+  height: 1080,
+  useWorkerThread: true,  // default, keeps event loop responsive
+});
+
+// Avoid sync mode in production
+// useWorkerThread: false  // blocks event loop
+```
+
+**High memory usage**
+
+Checklist:
+1. Are you closing all frames? ✓
+2. Are you closing all audio data? ✓
+3. Are you storing frames unnecessarily? ✓
+4. Are you calling flush() before close()? ✓
+
+```javascript
+// Bad - storing frames
+const frames = [];
+decoder = new VideoDecoder({
+  output: (frame) => {
+    frames.push(frame);  // Memory leak if not closed later!
+  },
+});
+
+// Good - process and close immediately
+decoder = new VideoDecoder({
+  output: (frame) => {
+    processFrame(frame);
+    frame.close();  // Free immediately
+  },
+});
+```
+
+**Slow encoding**
+
+Solutions:
+1. Enable hardware acceleration
+2. Reduce resolution or bitrate
+3. Use faster codec preset
+4. Check CPU/GPU usage
+
+```javascript
+// Hardware acceleration
+encoder.configure({
+  codec: 'avc1.42E01E',
+  width: 1920,
+  height: 1080,
+  bitrate: 5_000_000,
+  hardwareAcceleration: 'prefer-hardware',
+});
+
+// Lower resolution
+encoder.configure({
+  codec: 'avc1.42E01E',
+  width: 1280,  // Lower res = faster
+  height: 720,
+  bitrate: 2_000_000,
+});
+
+// Realtime mode
+encoder.configure({
+  codec: 'avc1.42E01E',
+  width: 1920,
+  height: 1080,
+  latencyMode: 'realtime',  // Faster, lower quality
+});
+```
+
+### Bun-Specific Issues
+
+**Native compilation fails**
+
+Error: `error: could not compile node-webcodecs`
+
+Solution:
+```bash
+# Trust the package to allow native compilation
+bun pm trust node-webcodecs
+
+# Then install
+bun add node-webcodecs
+```
+
+**N-API compatibility**
+
+Bun supports N-API 8, which node-webcodecs uses. If you encounter issues:
+
+```bash
+# Check Bun version (1.0+ required)
+bun --version
+
+# Update Bun
+bun upgrade
+
+# Try clean install
+rm -rf node_modules bun.lockb
+bun install
+```
+
+---
+
+## 11. TypeScript Integration
+
+### Importing Types
+
+```typescript
+import {
+  VideoEncoder,
+  VideoEncoderConfig,
+  VideoEncoderInit,
+  VideoDecoder,
+  VideoFrame,
+  VideoFrameBufferInit,
+  AudioEncoder,
+  AudioData,
+  EncodedVideoChunk,
+  ImageDecoder,
+} from 'node-webcodecs';
+```
+
+### Typed Usage Example
+
+```typescript
+import { VideoEncoder, VideoFrame, VideoEncoderConfig } from 'node-webcodecs';
+
+async function encodeTyped(): Promise<void> {
+  const chunks: Uint8Array[] = [];
+
+  const config: VideoEncoderConfig = {
+    codec: 'avc1.42E01E',
+    width: 640,
+    height: 480,
+    bitrate: 1_000_000,
+    framerate: 30,
+    latencyMode: 'quality',
+    bitrateMode: 'variable',
+  };
+
+  const encoder = new VideoEncoder({
+    output: (chunk, metadata) => {
+      // chunk is typed as EncodedVideoChunk
+      const buffer = new Uint8Array(chunk.byteLength);
+      chunk.copyTo(buffer);
+      chunks.push(buffer);
+
+      // metadata is typed
+      if (metadata?.decoderConfig) {
+        console.log('Decoder config:', metadata.decoderConfig.codec);
+      }
+    },
+    error: (err) => {
+      // err is typed as DOMException
+      console.error('Error:', err.message);
+    },
+  });
+
+  encoder.configure(config);
+
+  const frameData = new Uint8Array(640 * 480 * 4);
+  const frame: VideoFrame = new VideoFrame(frameData, {
+    format: 'RGBA',
+    codedWidth: 640,
+    codedHeight: 480,
+    timestamp: 0,
+  });
+
+  encoder.encode(frame, { keyFrame: true });
+  frame.close();
+
+  await encoder.flush();
+  encoder.close();
+}
+```
+
+### Codec Config Typing
+
+```typescript
+import { VideoEncoderConfig, VideoColorSpaceInit } from 'node-webcodecs';
+
+const hdrConfig: VideoEncoderConfig = {
+  codec: 'hvc1',
+  width: 3840,
+  height: 2160,
+  bitrate: 20_000_000,
+  colorSpace: {
+    primaries: 'bt2020',
+    transfer: 'pq',
+    matrix: 'bt2020-ncl',
+    fullRange: false,
+  } as VideoColorSpaceInit,
+};
+```
+
+### Callback Typing
+
+```typescript
+import { EncodedVideoChunk, VideoEncoderOutputMetadata, DOMException } from 'node-webcodecs';
+
+type OutputCallback = (chunk: EncodedVideoChunk, metadata?: VideoEncoderOutputMetadata) => void;
+type ErrorCallback = (error: DOMException) => void;
+
+const handleOutput: OutputCallback = (chunk, metadata) => {
+  console.log(`Chunk: ${chunk.byteLength} bytes`);
+};
+
+const handleError: ErrorCallback = (error) => {
+  console.error('Error:', error.message);
+};
+```
+
+---
+
+## 12. Native Utilities
+
+### getFFmpegVersion()
+
+Get FFmpeg library version information:
+
+```javascript
+const { getFFmpegVersion } = require('node-webcodecs');
+
+const version = getFFmpegVersion();
+console.log(version);
+// { avcodec: '60.3.100', avcodecVersion: '60.3.100' }
+```
+
+### listCodecs()
+
+List all available encoders and decoders:
+
+```javascript
+const { listCodecs } = require('node-webcodecs');
+
+const codecs = listCodecs();
+
+console.log('Encoders:', codecs.encoders.length);
+codecs.encoders.forEach(enc => {
+  console.log(`  ${enc.name}: ${enc.longName}`);
+});
+// Example output:
+//   h264_videotoolbox: VideoToolbox H.264 encoder
+//   libx264: libx264 H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
+
+console.log('Decoders:', codecs.decoders.length);
+codecs.decoders.forEach(dec => {
+  console.log(`  ${dec.name}: ${dec.longName}`);
+});
+```
+
+### hasCodec()
+
+Check if a specific codec is available:
+
+```javascript
+const { hasCodec } = require('node-webcodecs');
+
+// Check for hardware encoders
+const hasNVENC = hasCodec('h264_nvenc', 'encoder');
+const hasVideoToolbox = hasCodec('h264_videotoolbox', 'encoder');
+const hasQSV = hasCodec('h264_qsv', 'encoder');
+
+console.log('Hardware H.264 encoders:');
+console.log('  NVENC:', hasNVENC);
+console.log('  VideoToolbox:', hasVideoToolbox);
+console.log('  QuickSync:', hasQSV);
+
+// Check for decoders
+const hasH264Decoder = hasCodec('h264', 'decoder');
+const hasOpusDecoder = hasCodec('opus', 'decoder');
+```
+
+### isNativeAvailable()
+
+Check if native addon loaded successfully:
+
+```javascript
+const { isNativeAvailable } = require('node-webcodecs');
+
+if (!isNativeAvailable()) {
+  console.error('Native addon not available - check installation');
+  process.exit(1);
+}
+```
+
+---
+
+## 13. Bun Runtime Support
+
+### Installation with Bun
+
+```bash
+bun add node-webcodecs
+```
+
+If native compilation fails, trust the package:
+
+```bash
+bun pm trust node-webcodecs
+bun add node-webcodecs
+```
+
+### Usage with Bun
+
+API is identical to Node.js:
+
+```javascript
+// Works in Bun
+import { VideoEncoder, VideoFrame } from 'node-webcodecs';
+
+const encoder = new VideoEncoder({
+  output: (chunk) => {
+    console.log('Encoded:', chunk.byteLength);
+  },
+  error: (err) => console.error(err),
+});
+
+encoder.configure({
+  codec: 'avc1.42E01E',
+  width: 640,
+  height: 480,
+  bitrate: 1_000_000,
+});
+
+// ... rest is identical
+```
+
+### N-API Compatibility
+
+node-webcodecs uses N-API 8, which Bun supports through its N-API compatibility layer. All features work identically in Bun.
+
+### Known Differences
+
+None - the package works identically in both Node.js and Bun runtimes.
+
+### Testing with Bun
+
+```bash
+# Run examples with Bun
+bun examples/basic-video-encode.js
+bun examples/encode-decode-roundtrip.js
+```
+
+---
+
+## 14. Building from Source
+
+### Clone Repository
+
+```bash
+git clone https://github.com/caseymanos/node-webcodecs.git
+cd node-webcodecs
+```
+
+### Install Dependencies
+
+```bash
+npm install
+```
+
+This will:
+1. Install Node.js dependencies
+2. Compile native addon via cmake-js
+3. Build TypeScript sources
+
+### Build Scripts
+
+```bash
+# Build everything (native + TypeScript)
+npm run build
+
+# Build only native addon
+npm run build:native
+
+# Build only TypeScript
+npm run build:ts
+
+# Rebuild native addon
+npm run rebuild
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run integration tests
+npm run test:integration
+```
+
+### Development Workflow
+
+```bash
+# 1. Make changes to src/ or native/
+
+# 2. Rebuild
+npm run build
+
+# 3. Test changes
+npm test
+
+# 4. Run example
+node examples/basic-video-encode.js
+```
+
+### CMake Configuration
+
+The native addon is built with CMake. Configuration is in `CMakeLists.txt`.
+
+FFmpeg libraries are found via pkg-config:
+- libavcodec
+- libavutil
+- libswscale
+- libswresample
+
+### Troubleshooting Build
+
+**CMake errors:**
+```bash
+# Check CMake version (3.15+ required)
+cmake --version
+
+# Install if needed
+brew install cmake  # macOS
+sudo apt-get install cmake  # Ubuntu
+```
+
+**Linking errors:**
+```bash
+# Verify pkg-config finds FFmpeg
+pkg-config --libs libavcodec libavutil libswscale libswresample
+
+# Check library paths
+pkg-config --variable=libdir libavcodec
+```
+
+---
+
+## End of Documentation
+
+This comprehensive documentation covers all aspects of node-webcodecs for LLM-assisted development. For the latest updates and examples, visit:
+
+- GitHub: https://github.com/caseymanos/node-webcodecs
+- npm: https://www.npmjs.com/package/node-webcodecs
+- Website: https://node-webcodecs.com
+
+Version: 0.4.0
+Last Updated: 2025-12-02

@@ -1,0 +1,106 @@
+# node-webcodecs
+
+> Native WebCodecs API implementation for Node.js using FFmpeg
+
+## Overview
+
+node-webcodecs brings the W3C WebCodecs API to Node.js and Bun, enabling frame-level video/audio encoding and decoding with hardware acceleration support.
+
+## Quick Links
+
+- Installation & Setup
+- Quick Start Examples
+- API Reference
+- Codec Information
+- Advanced Features
+- Complete Examples
+- Troubleshooting
+
+## Package Details
+
+- **Version**: 0.4.0
+- **Runtime Support**: Node.js 18+, Bun 1.0+
+- **Repository**: https://github.com/caseymanos/node-webcodecs
+- **npm**: https://www.npmjs.com/package/node-webcodecs
+- **Website**: https://node-webcodecs.com
+
+## Key Features
+
+- W3C WebCodecs API compatible - same API as browser WebCodecs
+- Non-blocking async encoding/decoding with worker thread pool
+- Hardware acceleration: VideoToolbox (macOS), NVENC (NVIDIA), QSV (Intel), VAAPI (Linux)
+- Video codecs: H.264/AVC, H.265/HEVC, VP8, VP9, AV1
+- Audio codecs: AAC, Opus, FLAC, MP3
+- ImageDecoder for JPEG, PNG, GIF, WebP, BMP
+- Native codec probing with isConfigSupported
+- HDR support: BT.2020, PQ (HDR10), HLG
+- Alpha channel support (VP8/VP9)
+- Scalability modes for temporal layer SVC
+- Latency and bitrate control modes
+- Full TypeScript support
+
+## Installation
+
+```bash
+npm install node-webcodecs
+# or
+bun add node-webcodecs
+```
+
+**Platform Dependencies:**
+
+macOS (Homebrew):
+```bash
+brew install ffmpeg pkg-config
+```
+
+Ubuntu/Debian:
+```bash
+sudo apt-get install build-essential pkg-config libavcodec-dev libavutil-dev libswscale-dev libswresample-dev
+```
+
+## Full Documentation
+
+For complete documentation including all API details, examples, and troubleshooting:
+- llms-full.txt - Complete documentation in a single file (~15,000-20,000 tokens)
+- README.md - Primary documentation
+- examples/ - Working code examples
+
+## Quick Example
+
+```javascript
+const { VideoEncoder, VideoFrame } = require('node-webcodecs');
+
+const encoder = new VideoEncoder({
+  output: (chunk, metadata) => {
+    console.log(`Encoded: ${chunk.byteLength} bytes`);
+  },
+  error: (err) => console.error(err),
+});
+
+encoder.configure({
+  codec: 'avc1.42E01E',  // H.264 Baseline
+  width: 640,
+  height: 480,
+  bitrate: 1_000_000,
+});
+
+const frame = new VideoFrame(rgbaBuffer, {
+  format: 'RGBA',
+  codedWidth: 640,
+  codedHeight: 480,
+  timestamp: 0,
+});
+
+encoder.encode(frame, { keyFrame: true });
+frame.close();
+
+await encoder.flush();
+encoder.close();
+```
+
+## Support
+
+- GitHub Issues: https://github.com/caseymanos/node-webcodecs/issues
+- Documentation: https://github.com/caseymanos/node-webcodecs#readme
+- Examples: https://github.com/caseymanos/node-webcodecs/tree/main/examples
