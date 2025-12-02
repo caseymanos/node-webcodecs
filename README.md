@@ -10,6 +10,12 @@ Native WebCodecs API implementation for Node.js, using FFmpeg for encoding and d
 - **Hardware acceleration** - VideoToolbox (macOS), NVENC (NVIDIA), QSV (Intel), VAAPI (Linux)
 - **Video codecs**: H.264/AVC, H.265/HEVC, VP8, VP9, AV1
 - **Audio codecs**: AAC, Opus, FLAC, MP3
+- **ImageDecoder** - Decode JPEG, PNG, GIF, WebP, BMP images
+- **HDR support** - BT.2020, PQ (HDR10), HLG color spaces
+- **Alpha channel** - VP8/VP9 with transparency (`alpha: 'keep'`)
+- **Scalability modes** - Temporal layer SVC (L1T1, L1T2, L1T3)
+- **Latency modes** - `'quality'` vs `'realtime'` encoding
+- **Bitrate modes** - `'constant'`, `'variable'`, `'quantizer'`
 - **High performance** - Native C++ bindings with FFmpeg
 - **Backpressure support** - `encodeQueueSize`, `decodeQueueSize`, and `dequeue` events
 - **TypeScript support** - Full type definitions included
@@ -136,9 +142,80 @@ const audio = new AudioData({
 
 encoder.encode(audio);
 audio.close();
- 
+
 await encoder.flush();
 encoder.close();
+```
+
+### Image Decoding
+
+```javascript
+const { ImageDecoder } = require('node-webcodecs');
+const fs = require('fs');
+
+const imageData = fs.readFileSync('photo.jpg');
+
+const decoder = new ImageDecoder({
+  data: imageData,
+  type: 'image/jpeg',
+});
+
+await decoder.completed;
+
+console.log(`Image: ${decoder.tracks.selectedTrack.frameCount} frame(s)`);
+
+const result = await decoder.decode({ frameIndex: 0 });
+const frame = result.image;
+
+console.log(`Decoded: ${frame.codedWidth}x${frame.codedHeight}`);
+frame.close();
+decoder.close();
+```
+
+### Advanced Encoding Options
+
+```javascript
+// HDR encoding with BT.2020 + PQ
+encoder.configure({
+  codec: 'hvc1',
+  width: 3840,
+  height: 2160,
+  bitrate: 20_000_000,
+  colorSpace: {
+    primaries: 'bt2020',
+    transfer: 'pq',        // HDR10
+    matrix: 'bt2020-ncl',
+    fullRange: false,
+  },
+});
+
+// Low-latency realtime encoding
+encoder.configure({
+  codec: 'avc1.42E01E',
+  width: 1280,
+  height: 720,
+  bitrate: 2_000_000,
+  latencyMode: 'realtime',
+  bitrateMode: 'constant',
+});
+
+// VP9 with alpha channel
+encoder.configure({
+  codec: 'vp09.00.10.08',
+  width: 640,
+  height: 480,
+  bitrate: 1_000_000,
+  alpha: 'keep',  // Preserve alpha channel
+});
+
+// Temporal layer SVC
+encoder.configure({
+  codec: 'vp09.00.10.08',
+  width: 1280,
+  height: 720,
+  bitrate: 2_000_000,
+  scalabilityMode: 'L1T2',  // 1 spatial, 2 temporal layers
+});
 ```
 
 ## Supported Codecs
@@ -235,6 +312,19 @@ decoder.decode(chunk: EncodedAudioChunk);
 await decoder.flush();
 decoder.close();
 decoder.reset();
+```
+
+### ImageDecoder
+
+```typescript
+const decoder = new ImageDecoder(init: ImageDecoderInit);
+await decoder.completed;              // Promise that resolves when ready
+decoder.type;                         // MIME type
+decoder.tracks;                       // ImageTrackList with frame info
+const result = await decoder.decode({ frameIndex: 0 });
+decoder.close();
+
+// Supported types: image/jpeg, image/png, image/gif, image/webp, image/bmp
 ```
 
 ### VideoFrame

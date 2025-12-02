@@ -16,6 +16,9 @@ export { EncodedAudioChunk, EncodedAudioChunkInit, EncodedAudioChunkType } from 
 // Color space
 export { VideoColorSpace, VideoColorSpaceInit, VideoColorPrimaries, VideoTransferCharacteristics, VideoMatrixCoefficients } from './VideoColorSpace';
 
+// Image decoder
+export { ImageDecoder, ImageDecoderInit, ImageDecodeResult, ImageDecodeOptions } from './ImageDecoder';
+
 // Video encoder/decoder
 export {
   VideoEncoder,

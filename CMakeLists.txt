@@ -30,6 +30,9 @@ set(SOURCE_FILES
     native/audio.cpp
     native/util.cpp
     native/hw_accel.cpp
+    native/image_decoder.cpp
+    native/color.cpp
+    native/svc.cpp
 )
 
 # Build the addon

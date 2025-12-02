@@ -9,7 +9,10 @@
         "native/encoder.cpp",
         "native/decoder.cpp",
         "native/util.cpp",
-        "native/hw_accel.cpp"
+        "native/hw_accel.cpp",
+        "native/image_decoder.cpp",
+        "native/color.cpp",
+        "native/svc.cpp"
       ],
       "include_dirs": [
         "<!@(node -p \"require('node-addon-api').include\")",

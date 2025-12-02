@@ -1,6 +1,6 @@
 {
   "name": "node-webcodecs",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Native WebCodecs API implementation for Node.js using FFmpeg",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -31,7 +31,11 @@
     "av1",
     "aac",
     "opus",
-    "media"
+    "media",
+    "hdr",
+    "alpha",
+    "svc",
+    "image-decoder"
   ],
   "author": "caseymanos",
   "license": "MIT",

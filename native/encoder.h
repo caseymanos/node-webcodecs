@@ -48,6 +48,18 @@ private:
     bool avcAnnexB_;
     int width_;
     int height_;
+
+    // Rate control
+    std::string bitrateMode_;
+    std::string codecName_;
+    int64_t bitrate_;
+
+    // Alpha channel support
+    bool alpha_;
+
+    // Scalability mode (SVC)
+    std::string scalabilityMode_;
+    int temporalLayers_;
 };
 
 #endif

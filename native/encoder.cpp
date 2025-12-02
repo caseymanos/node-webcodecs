@@ -1,6 +1,8 @@
 #include "encoder.h"
 #include "frame.h"
 #include "hw_accel.h"
+#include "color.h"
+#include "svc.h"
 
 Napi::FunctionReference VideoEncoderNative::constructor;
 
@@ -32,7 +34,13 @@ VideoEncoderNative::VideoEncoderNative(const Napi::CallbackInfo& info)
     , configured_(false)
     , avcAnnexB_(true)
     , width_(0)
-    , height_(0) {
+    , height_(0)
+    , bitrateMode_("variable")
+    , codecName_("")
+    , bitrate_(2000000)
+    , alpha_(false)
+    , scalabilityMode_("")
+    , temporalLayers_(1) {
 
     Napi::Env env = info.Env();
 
@@ -65,33 +73,48 @@ VideoEncoderNative::~VideoEncoderNative() {
 }
 
 void VideoEncoderNative::configureEncoderOptions(const std::string& encoderName, const std::string& latencyMode) {
+    bool isRealtime = (latencyMode == "realtime");
+
+    // Global realtime optimizations - threading and delay
+    if (isRealtime) {
+        codecCtx_->thread_count = 1;  // Single thread for lowest latency
+        codecCtx_->thread_type = 0;   // Disable threading
+        codecCtx_->delay = 0;         // No delay
+        codecCtx_->max_b_frames = 0;  // No B-frames for lowest latency
+        codecCtx_->refs = 1;          // Single reference frame
+    }
+
     if (encoderName == "libx264") {
-        if (latencyMode == "realtime") {
+        if (isRealtime) {
             av_opt_set(codecCtx_->priv_data, "preset", "ultrafast", 0);
             av_opt_set(codecCtx_->priv_data, "tune", "zerolatency", 0);
+            av_opt_set(codecCtx_->priv_data, "rc-lookahead", "0", 0);
+            av_opt_set(codecCtx_->priv_data, "sync-lookahead", "0", 0);
+            av_opt_set(codecCtx_->priv_data, "intra-refresh", "1", 0);
         } else {
             av_opt_set(codecCtx_->priv_data, "preset", "medium", 0);
         }
     }
     else if (encoderName == "h264_videotoolbox" || encoderName == "hevc_videotoolbox") {
-        av_opt_set(codecCtx_->priv_data, "realtime",
-                   latencyMode == "realtime" ? "1" : "0", 0);
+        av_opt_set(codecCtx_->priv_data, "realtime", isRealtime ? "1" : "0", 0);
         av_opt_set(codecCtx_->priv_data, "allow_sw", "1", 0);  // Allow software fallback
     }
     else if (encoderName == "h264_nvenc" || encoderName == "hevc_nvenc") {
-        if (latencyMode == "realtime") {
+        if (isRealtime) {
             av_opt_set(codecCtx_->priv_data, "preset", "p1", 0);  // Fastest
             av_opt_set(codecCtx_->priv_data, "tune", "ll", 0);    // Low latency
             av_opt_set(codecCtx_->priv_data, "zerolatency", "1", 0);
+            av_opt_set(codecCtx_->priv_data, "rc-lookahead", "0", 0);
         } else {
             av_opt_set(codecCtx_->priv_data, "preset", "p4", 0);  // Balanced
         }
         av_opt_set(codecCtx_->priv_data, "rc", "cbr", 0);
     }
     else if (encoderName == "h264_qsv" || encoderName == "hevc_qsv") {
-        if (latencyMode == "realtime") {
+        if (isRealtime) {
             av_opt_set(codecCtx_->priv_data, "preset", "veryfast", 0);
             av_opt_set(codecCtx_->priv_data, "low_delay_brc", "1", 0);
+            av_opt_set(codecCtx_->priv_data, "look_ahead", "0", 0);
         }
     }
     else if (encoderName == "libvpx" || encoderName == "libvpx-vp9") {
@@ -100,14 +123,27 @@ void VideoEncoderNative::configureEncoderOptions(const std::string& encoderName,
             av_opt_set_int(codecCtx_->priv_data, "crf", 10, 0);
             av_opt_set_int(codecCtx_->priv_data, "b", codecCtx_->bit_rate, 0);
         }
-        av_opt_set_int(codecCtx_->priv_data, "cpu-used", 4, 0);
+        if (isRealtime) {
+            av_opt_set_int(codecCtx_->priv_data, "cpu-used", 8, 0);  // Fastest
+            av_opt_set_int(codecCtx_->priv_data, "lag-in-frames", 0, 0);
+            av_opt_set(codecCtx_->priv_data, "deadline", "realtime", 0);
+        } else {
+            av_opt_set_int(codecCtx_->priv_data, "cpu-used", 4, 0);
+        }
     }
     else if (encoderName == "libx265") {
-        av_opt_set(codecCtx_->priv_data, "preset", latencyMode == "realtime" ? "ultrafast" : "medium", 0);
+        av_opt_set(codecCtx_->priv_data, "preset", isRealtime ? "ultrafast" : "medium", 0);
+        if (isRealtime) {
+            av_opt_set(codecCtx_->priv_data, "tune", "zerolatency", 0);
+        }
     }
     else if (encoderName == "libaom-av1" || encoderName == "libsvtav1") {
-        if (latencyMode == "realtime") {
-            av_opt_set_int(codecCtx_->priv_data, "cpu-used", 8, 0);
+        if (isRealtime) {
+            av_opt_set_int(codecCtx_->priv_data, "cpu-used", 10, 0);  // Max speed
+            av_opt_set_int(codecCtx_->priv_data, "lag-in-frames", 0, 0);
+            av_opt_set(codecCtx_->priv_data, "usage", "realtime", 0);
+        } else {
+            av_opt_set_int(codecCtx_->priv_data, "cpu-used", 6, 0);
         }
     }
 }
@@ -169,11 +205,57 @@ void VideoEncoderNative::Configure(const Napi::CallbackInfo& info) {
     // Time base - default to 1/1000000 (microseconds)
     codecCtx_->time_base = { 1, 1000000 };
 
+    // Store codec name for later use
+    codecName_ = codec_->name;
+
     // Bitrate
     if (config.Has("bitrate")) {
-        codecCtx_->bit_rate = config.Get("bitrate").As<Napi::Number>().Int64Value();
+        bitrate_ = config.Get("bitrate").As<Napi::Number>().Int64Value();
     } else {
-        codecCtx_->bit_rate = 2000000;  // 2 Mbps default
+        bitrate_ = 2000000;  // 2 Mbps default
+    }
+
+    // Bitrate mode: 'constant', 'variable', or 'quantizer'
+    if (config.Has("bitrateMode")) {
+        bitrateMode_ = config.Get("bitrateMode").As<Napi::String>().Utf8Value();
+    } else {
+        bitrateMode_ = "variable";
+    }
+
+    // Configure rate control based on bitrateMode
+    if (bitrateMode_ == "constant") {
+        // CBR - Constant Bit Rate
+        codecCtx_->bit_rate = bitrate_;
+        codecCtx_->rc_min_rate = bitrate_;
+        codecCtx_->rc_max_rate = bitrate_;
+        codecCtx_->rc_buffer_size = static_cast<int>(bitrate_);  // 1 second buffer
+
+        // Codec-specific CBR settings
+        if (codecName_.find("libx264") != std::string::npos) {
+            av_opt_set(codecCtx_->priv_data, "nal-hrd", "cbr", 0);
+        } else if (codecName_.find("libvpx") != std::string::npos) {
+            av_opt_set_int(codecCtx_->priv_data, "minrate", bitrate_, 0);
+            av_opt_set_int(codecCtx_->priv_data, "maxrate", bitrate_, 0);
+        }
+    } else if (bitrateMode_ == "quantizer") {
+        // CQP/CRF mode - Constant Quality, ignore bitrate
+        codecCtx_->bit_rate = 0;
+        codecCtx_->rc_max_rate = 0;
+
+        // Set default quantizer based on codec
+        if (codecName_.find("libx264") != std::string::npos ||
+            codecName_.find("libx265") != std::string::npos) {
+            av_opt_set_int(codecCtx_->priv_data, "crf", 23, 0);  // Default CRF
+        } else if (codecName_.find("libvpx") != std::string::npos) {
+            av_opt_set_int(codecCtx_->priv_data, "crf", 30, 0);  // Default for VP8/9
+            codecCtx_->qmin = 0;
+            codecCtx_->qmax = 63;
+        } else if (codecName_.find("av1") != std::string::npos) {
+            av_opt_set_int(codecCtx_->priv_data, "crf", 30, 0);  // Default for AV1
+        }
+    } else {
+        // VBR (default) - Variable Bit Rate
+        codecCtx_->bit_rate = bitrate_;
     }
 
     // Framerate for GOP calculation
@@ -187,11 +269,42 @@ void VideoEncoderNative::Configure(const Napi::CallbackInfo& info) {
     // Max B-frames
     codecCtx_->max_b_frames = 0;  // Disable B-frames for lower latency
 
-    // Set pixel format based on encoder type
+    // Parse alpha option
+    if (config.Has("alpha") && config.Get("alpha").IsString()) {
+        std::string alphaMode = config.Get("alpha").As<Napi::String>().Utf8Value();
+        alpha_ = (alphaMode == "keep");
+    }
+
+    // Set pixel format based on encoder type and alpha mode
     if (hwType_ != HWAccel::Type::None && hwInputFormat_ != AV_PIX_FMT_NONE) {
         codecCtx_->pix_fmt = hwInputFormat_;
+    } else if (alpha_ && (codecName_.find("libvpx") != std::string::npos)) {
+        // VP8/VP9 with alpha - use YUVA420P
+        codecCtx_->pix_fmt = AV_PIX_FMT_YUVA420P;
     } else {
         codecCtx_->pix_fmt = AV_PIX_FMT_YUV420P;
+    }
+
+    // Color space configuration (HDR support)
+    if (config.Has("colorSpace") && config.Get("colorSpace").IsObject()) {
+        Napi::Object cs = config.Get("colorSpace").As<Napi::Object>();
+
+        if (cs.Has("primaries") && cs.Get("primaries").IsString()) {
+            codecCtx_->color_primaries = ColorSpace::parsePrimaries(
+                cs.Get("primaries").As<Napi::String>().Utf8Value());
+        }
+        if (cs.Has("transfer") && cs.Get("transfer").IsString()) {
+            codecCtx_->color_trc = ColorSpace::parseTransfer(
+                cs.Get("transfer").As<Napi::String>().Utf8Value());
+        }
+        if (cs.Has("matrix") && cs.Get("matrix").IsString()) {
+            codecCtx_->colorspace = ColorSpace::parseMatrix(
+                cs.Get("matrix").As<Napi::String>().Utf8Value());
+        }
+        if (cs.Has("fullRange") && cs.Get("fullRange").IsBoolean()) {
+            codecCtx_->color_range = cs.Get("fullRange").As<Napi::Boolean>().Value()
+                ? AVCOL_RANGE_JPEG : AVCOL_RANGE_MPEG;
+        }
     }
 
     // Setup hardware device context if needed
@@ -244,6 +357,82 @@ void VideoEncoderNative::Configure(const Napi::CallbackInfo& info) {
         latencyMode = config.Get("latencyMode").As<Napi::String>().Utf8Value();
     }
     configureEncoderOptions(encoderName, latencyMode);
+
+    // Scalability mode (SVC) for temporal layers
+    if (config.Has("scalabilityMode") && config.Get("scalabilityMode").IsString()) {
+        std::string svcMode = config.Get("scalabilityMode").As<Napi::String>().Utf8Value();
+
+        if (!isScalabilityModeSupported(svcMode)) {
+            Napi::Error::New(env, "Unsupported scalabilityMode: " + svcMode +
+                ". Only L1T1, L1T2, L1T3 are currently supported.")
+                .ThrowAsJavaScriptException();
+            return;
+        }
+
+        ScalabilityConfig svcConfig = parseScalabilityMode(svcMode);
+
+        if (svcConfig.temporalLayers > 1) {
+            temporalLayers_ = svcConfig.temporalLayers;
+
+            if (encoderName.find("libvpx") != std::string::npos) {
+                // VP8/VP9 temporal layer configuration
+                av_opt_set(codecCtx_->priv_data, "lag-in-frames", "0", 0);
+                av_opt_set(codecCtx_->priv_data, "error-resilient", "1", 0);
+                av_opt_set_int(codecCtx_->priv_data, "auto-alt-ref", 0, 0);
+
+                // Build complete ts-parameters string for libvpx
+                // Format: ts_number_layers=N:ts_target_bitrate=B1,B2,...:ts_rate_decimator=D1,D2,...
+                char tsParams[256];
+                int layers = svcConfig.temporalLayers;
+
+                if (layers == 2) {
+                    // L1T2: 2 temporal layers
+                    // Layer 0: 60% bitrate, show every 2nd frame (decimator=2)
+                    // Layer 1: 100% bitrate, show every frame (decimator=1)
+                    int br0 = static_cast<int>(bitrate_ * 0.6 / 1000);  // Convert to kbps
+                    int br1 = static_cast<int>(bitrate_ / 1000);
+                    snprintf(tsParams, sizeof(tsParams),
+                        "ts_number_layers=2:ts_target_bitrate=%d,%d:ts_rate_decimator=2,1:ts_periodicity=2:ts_layer_id=0,1",
+                        br0, br1);
+                } else if (layers == 3) {
+                    // L1T3: 3 temporal layers
+                    // Layer 0: 25% bitrate, decimator 4
+                    // Layer 1: 50% bitrate, decimator 2
+                    // Layer 2: 100% bitrate, decimator 1
+                    int br0 = static_cast<int>(bitrate_ * 0.25 / 1000);
+                    int br1 = static_cast<int>(bitrate_ * 0.5 / 1000);
+                    int br2 = static_cast<int>(bitrate_ / 1000);
+                    snprintf(tsParams, sizeof(tsParams),
+                        "ts_number_layers=3:ts_target_bitrate=%d,%d,%d:ts_rate_decimator=4,2,1:ts_periodicity=4:ts_layer_id=0,2,1,2",
+                        br0, br1, br2);
+                }
+
+                av_opt_set(codecCtx_->priv_data, "ts-parameters", tsParams, 0);
+            }
+            else if (encoderName.find("libaom") != std::string::npos ||
+                     encoderName.find("av1") != std::string::npos) {
+                // AV1 temporal layer configuration
+                av_opt_set(codecCtx_->priv_data, "lag-in-frames", "0", 0);
+
+                // Use usage=realtime for SVC
+                av_opt_set(codecCtx_->priv_data, "usage", "realtime", 0);
+            }
+            else if (encoderName.find("libsvtav1") != std::string::npos) {
+                // SVT-AV1 temporal layer configuration
+                char hierLevels[8];
+                snprintf(hierLevels, sizeof(hierLevels), "%d", svcConfig.temporalLayers - 1);
+                av_opt_set(codecCtx_->priv_data, "hierarchical-levels", hierLevels, 0);
+            }
+        }
+
+        scalabilityMode_ = svcMode;
+    }
+
+    // Alpha channel configuration for libvpx (VP8/VP9)
+    // auto-alt-ref must be disabled for transparency encoding to work
+    if (alpha_ && codecName_.find("libvpx") != std::string::npos) {
+        av_opt_set_int(codecCtx_->priv_data, "auto-alt-ref", 0, 0);
+    }
 
     // Open codec
     int ret = avcodec_open2(codecCtx_, codec_, nullptr);
@@ -327,6 +516,16 @@ void VideoEncoderNative::Encode(const Napi::CallbackInfo& info) {
     AVPixelFormat targetFormat = codecCtx_->pix_fmt;
     if (targetFormat == AV_PIX_FMT_VAAPI || targetFormat == AV_PIX_FMT_NONE) {
         targetFormat = AV_PIX_FMT_YUV420P;
+    }
+
+    // Check if input has alpha and we want to preserve it
+    bool inputHasAlpha = (srcFrame->format == AV_PIX_FMT_RGBA ||
+                          srcFrame->format == AV_PIX_FMT_BGRA ||
+                          srcFrame->format == AV_PIX_FMT_YUVA420P);
+
+    // If alpha mode is 'keep' and input has alpha, ensure we use YUVA420P
+    if (alpha_ && inputHasAlpha && targetFormat == AV_PIX_FMT_YUV420P) {
+        targetFormat = AV_PIX_FMT_YUVA420P;
     }
 
     // Clone and convert frame
@@ -416,12 +615,24 @@ void VideoEncoderNative::EmitChunk(Napi::Env env, AVPacket* packet, bool isKeyfr
         extradataValue = Napi::Buffer<uint8_t>::Copy(env, codecCtx_->extradata, codecCtx_->extradata_size);
     }
 
+    // Check for alpha side data (VP9 with alpha stores alpha plane here)
+    Napi::Value alphaSideDataValue = env.Undefined();
+    if (alpha_) {
+        size_t sideDataSize = 0;
+        const uint8_t* sideData = av_packet_get_side_data(packet,
+            AV_PKT_DATA_MATROSKA_BLOCKADDITIONAL, &sideDataSize);
+        if (sideData && sideDataSize > 0) {
+            alphaSideDataValue = Napi::Buffer<uint8_t>::Copy(env, sideData, sideDataSize);
+        }
+    }
+
     outputCallback_.Value().Call({
         buffer,
         Napi::Boolean::New(env, isKeyframe),
         Napi::Number::New(env, packet->pts),
         Napi::Number::New(env, packet->duration),
-        extradataValue
+        extradataValue,
+        alphaSideDataValue
     });
 }
 

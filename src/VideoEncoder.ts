@@ -7,6 +7,7 @@ import { VideoFrame } from './VideoFrame';
 import { EncodedVideoChunk, EncodedVideoChunkType } from './EncodedVideoChunk';
 import { isVideoCodecSupported, getFFmpegVideoCodec, parseAvcCodecString } from './codec-registry';
 import { CodecState, DOMException } from './types';
+import { VideoColorSpaceInit } from './VideoColorSpace';
 
 export type LatencyMode = 'quality' | 'realtime';
 export type BitrateMode = 'constant' | 'variable' | 'quantizer';
@@ -25,6 +26,7 @@ export interface VideoEncoderConfig {
   scalabilityMode?: string;
   bitrateMode?: BitrateMode;
   latencyMode?: LatencyMode;
+  colorSpace?: VideoColorSpaceInit;
   avc?: {
     format?: 'annexb' | 'avc';
   };
@@ -170,6 +172,22 @@ export class VideoEncoder {
       throw new DOMException('Invalid dimensions', 'NotSupportedError');
     }
 
+    // Validate latencyMode
+    if (config.latencyMode && !['quality', 'realtime'].includes(config.latencyMode)) {
+      throw new DOMException(
+        `Invalid latencyMode: ${config.latencyMode}. Must be 'quality' or 'realtime'.`,
+        'TypeError'
+      );
+    }
+
+    // Validate bitrateMode
+    if (config.bitrateMode && !['constant', 'variable', 'quantizer'].includes(config.bitrateMode)) {
+      throw new DOMException(
+        `Invalid bitrateMode: ${config.bitrateMode}. Must be 'constant', 'variable', or 'quantizer'.`,
+        'TypeError'
+      );
+    }
+
     if (!native) {
       throw new DOMException('Native addon not available', 'NotSupportedError');
     }
@@ -195,6 +213,10 @@ export class VideoEncoder {
     if (config.framerate) codecParams.framerate = config.framerate;
     if (config.bitrateMode) codecParams.bitrateMode = config.bitrateMode;
     if (config.latencyMode) codecParams.latencyMode = config.latencyMode;
+    if (config.colorSpace) codecParams.colorSpace = config.colorSpace;
+    if (config.hardwareAcceleration) codecParams.hardwareAcceleration = config.hardwareAcceleration;
+    if (config.alpha) codecParams.alpha = config.alpha;
+    if (config.scalabilityMode) codecParams.scalabilityMode = config.scalabilityMode;
 
     this._native.configure(codecParams);
     this._config = config;

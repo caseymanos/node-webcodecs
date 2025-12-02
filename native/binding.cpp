@@ -3,6 +3,7 @@
 #include "audio.h"
 #include "encoder.h"
 #include "decoder.h"
+#include "image_decoder.h"
 
 // Forward declaration
 void InitUtil(Napi::Env env, Napi::Object exports);
@@ -19,6 +20,9 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     // Initialize video encoder/decoder
     VideoEncoderNative::Init(env, exports);
     VideoDecoderNative::Init(env, exports);
+
+    // Initialize image decoder
+    ImageDecoderNative::Init(env, exports);
 
     // Add factory functions
     exports.Set("createVideoFrame", Napi::Function::New(env, CreateVideoFrame));

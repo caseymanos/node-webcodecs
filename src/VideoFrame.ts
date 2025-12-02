@@ -53,6 +53,7 @@ export interface VideoFrameCopyToOptions {
     height: number;
   };
   layout?: PlaneLayout[];
+  format?: VideoPixelFormat;
 }
 
 // Load native addon
@@ -173,15 +174,16 @@ export class VideoFrame {
   allocationSize(options?: VideoFrameCopyToOptions): number {
     this._assertNotClosed();
 
-    if (this._native) {
-      return this._native.allocationSize();
-    }
-
-    // Calculate size based on format
+    // Calculate size based on target format and dimensions
     const width = options?.rect?.width ?? this.codedWidth;
     const height = options?.rect?.height ?? this.codedHeight;
+    const targetFormat = options?.format ?? this.format;
 
-    switch (this.format) {
+    return this._calculateFormatSize(targetFormat, width, height);
+  }
+
+  private _calculateFormatSize(format: VideoPixelFormat | null, width: number, height: number): number {
+    switch (format) {
       case 'RGBA':
       case 'RGBX':
       case 'BGRA':
@@ -262,8 +264,9 @@ export class VideoFrame {
   private _getPlaneLayouts(options?: VideoFrameCopyToOptions): PlaneLayout[] {
     const width = options?.rect?.width ?? this.codedWidth;
     const height = options?.rect?.height ?? this.codedHeight;
+    const targetFormat = options?.format ?? this.format;
 
-    switch (this.format) {
+    switch (targetFormat) {
       case 'RGBA':
       case 'RGBX':
       case 'BGRA':

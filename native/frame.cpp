@@ -244,21 +244,171 @@ Napi::Value VideoFrameNative::CopyTo(const Napi::CallbackInfo& info) {
 
     Napi::Buffer<uint8_t> dest = info[0].As<Napi::Buffer<uint8_t>>();
 
-    int size = av_image_copy_to_buffer(
-        dest.Data(),
-        dest.Length(),
-        frame_->data,
-        frame_->linesize,
-        (AVPixelFormat)frame_->format,
-        frame_->width,
-        frame_->height,
-        1
-    );
+    // Parse options for format conversion and rect cropping
+    AVPixelFormat targetFormat = static_cast<AVPixelFormat>(frame_->format);
+    int rectX = 0, rectY = 0;
+    int rectW = frame_->width, rectH = frame_->height;
 
-    if (size < 0) {
-        char errBuf[256];
-        av_strerror(size, errBuf, sizeof(errBuf));
-        Napi::Error::New(env, std::string("Failed to copy frame data: ") + errBuf).ThrowAsJavaScriptException();
+    if (info.Length() > 1 && info[1].IsObject()) {
+        Napi::Object options = info[1].As<Napi::Object>();
+
+        // Format conversion
+        if (options.Has("format") && options.Get("format").IsString()) {
+            std::string fmt = options.Get("format").As<Napi::String>().Utf8Value();
+            AVPixelFormat newFmt = StringToPixelFormat(fmt);
+            if (newFmt != AV_PIX_FMT_NONE) {
+                targetFormat = newFmt;
+            }
+        }
+
+        // Rect cropping
+        if (options.Has("rect") && options.Get("rect").IsObject()) {
+            Napi::Object rect = options.Get("rect").As<Napi::Object>();
+            if (rect.Has("x")) rectX = rect.Get("x").As<Napi::Number>().Int32Value();
+            if (rect.Has("y")) rectY = rect.Get("y").As<Napi::Number>().Int32Value();
+            if (rect.Has("width")) rectW = rect.Get("width").As<Napi::Number>().Int32Value();
+            if (rect.Has("height")) rectH = rect.Get("height").As<Napi::Number>().Int32Value();
+
+            // Clamp rect to frame bounds
+            if (rectX < 0) rectX = 0;
+            if (rectY < 0) rectY = 0;
+            if (rectX + rectW > frame_->width) rectW = frame_->width - rectX;
+            if (rectY + rectH > frame_->height) rectH = frame_->height - rectY;
+        }
+    }
+
+    // Check if we need conversion/cropping
+    bool needsConversion = (targetFormat != frame_->format) ||
+                          (rectX != 0 || rectY != 0 ||
+                           rectW != frame_->width || rectH != frame_->height);
+
+    if (needsConversion) {
+        // Use swscale for format conversion and/or cropping
+        SwsContext* swsCtx = sws_getContext(
+            rectW, rectH, static_cast<AVPixelFormat>(frame_->format),
+            rectW, rectH, targetFormat,
+            SWS_BILINEAR, nullptr, nullptr, nullptr
+        );
+
+        if (!swsCtx) {
+            Napi::Error::New(env, "Failed to create conversion context").ThrowAsJavaScriptException();
+            return env.Undefined();
+        }
+
+        // Create output frame
+        AVFrame* outFrame = av_frame_alloc();
+        if (!outFrame) {
+            sws_freeContext(swsCtx);
+            Napi::Error::New(env, "Failed to allocate output frame").ThrowAsJavaScriptException();
+            return env.Undefined();
+        }
+
+        outFrame->format = targetFormat;
+        outFrame->width = rectW;
+        outFrame->height = rectH;
+
+        int ret = av_frame_get_buffer(outFrame, 0);
+        if (ret < 0) {
+            av_frame_free(&outFrame);
+            sws_freeContext(swsCtx);
+            char errBuf[256];
+            av_strerror(ret, errBuf, sizeof(errBuf));
+            Napi::Error::New(env, std::string("Failed to allocate output buffer: ") + errBuf).ThrowAsJavaScriptException();
+            return env.Undefined();
+        }
+
+        // Adjust source pointers for rect offset
+        uint8_t* srcSlice[4] = {nullptr, nullptr, nullptr, nullptr};
+        int srcStride[4] = {0, 0, 0, 0};
+
+        AVPixelFormat srcFmt = static_cast<AVPixelFormat>(frame_->format);
+
+        // Calculate byte offset for the crop region
+        if (srcFmt == AV_PIX_FMT_YUV420P || srcFmt == AV_PIX_FMT_YUVA420P) {
+            // YUV420P: Y is full res, U/V are half res
+            srcSlice[0] = frame_->data[0] + rectY * frame_->linesize[0] + rectX;
+            srcSlice[1] = frame_->data[1] + (rectY / 2) * frame_->linesize[1] + (rectX / 2);
+            srcSlice[2] = frame_->data[2] + (rectY / 2) * frame_->linesize[2] + (rectX / 2);
+            if (srcFmt == AV_PIX_FMT_YUVA420P && frame_->data[3]) {
+                srcSlice[3] = frame_->data[3] + rectY * frame_->linesize[3] + rectX;
+            }
+            srcStride[0] = frame_->linesize[0];
+            srcStride[1] = frame_->linesize[1];
+            srcStride[2] = frame_->linesize[2];
+            srcStride[3] = frame_->linesize[3];
+        } else if (srcFmt == AV_PIX_FMT_YUV422P) {
+            // YUV422P: Y is full res, U/V are half width, full height
+            srcSlice[0] = frame_->data[0] + rectY * frame_->linesize[0] + rectX;
+            srcSlice[1] = frame_->data[1] + rectY * frame_->linesize[1] + (rectX / 2);
+            srcSlice[2] = frame_->data[2] + rectY * frame_->linesize[2] + (rectX / 2);
+            srcStride[0] = frame_->linesize[0];
+            srcStride[1] = frame_->linesize[1];
+            srcStride[2] = frame_->linesize[2];
+        } else if (srcFmt == AV_PIX_FMT_YUV444P) {
+            // YUV444P: all planes are full res
+            srcSlice[0] = frame_->data[0] + rectY * frame_->linesize[0] + rectX;
+            srcSlice[1] = frame_->data[1] + rectY * frame_->linesize[1] + rectX;
+            srcSlice[2] = frame_->data[2] + rectY * frame_->linesize[2] + rectX;
+            srcStride[0] = frame_->linesize[0];
+            srcStride[1] = frame_->linesize[1];
+            srcStride[2] = frame_->linesize[2];
+        } else if (srcFmt == AV_PIX_FMT_NV12) {
+            // NV12: Y plane, interleaved UV plane (half res)
+            srcSlice[0] = frame_->data[0] + rectY * frame_->linesize[0] + rectX;
+            srcSlice[1] = frame_->data[1] + (rectY / 2) * frame_->linesize[1] + (rectX & ~1);
+            srcStride[0] = frame_->linesize[0];
+            srcStride[1] = frame_->linesize[1];
+        } else {
+            // Packed formats (RGBA, BGRA, etc.) - 4 bytes per pixel
+            int bytesPerPixel = 4;
+            srcSlice[0] = frame_->data[0] + rectY * frame_->linesize[0] + rectX * bytesPerPixel;
+            srcStride[0] = frame_->linesize[0];
+        }
+
+        // Perform the conversion
+        sws_scale(swsCtx, srcSlice, srcStride, 0, rectH,
+                  outFrame->data, outFrame->linesize);
+
+        // Copy converted frame to destination buffer
+        int size = av_image_copy_to_buffer(
+            dest.Data(),
+            dest.Length(),
+            outFrame->data,
+            outFrame->linesize,
+            targetFormat,
+            rectW,
+            rectH,
+            1
+        );
+
+        av_frame_free(&outFrame);
+        sws_freeContext(swsCtx);
+
+        if (size < 0) {
+            char errBuf[256];
+            av_strerror(size, errBuf, sizeof(errBuf));
+            Napi::Error::New(env, std::string("Failed to copy converted frame: ") + errBuf).ThrowAsJavaScriptException();
+            return env.Undefined();
+        }
+    } else {
+        // Direct copy - no conversion needed
+        int size = av_image_copy_to_buffer(
+            dest.Data(),
+            dest.Length(),
+            frame_->data,
+            frame_->linesize,
+            (AVPixelFormat)frame_->format,
+            frame_->width,
+            frame_->height,
+            1
+        );
+
+        if (size < 0) {
+            char errBuf[256];
+            av_strerror(size, errBuf, sizeof(errBuf));
+            Napi::Error::New(env, std::string("Failed to copy frame data: ") + errBuf).ThrowAsJavaScriptException();
+            return env.Undefined();
+        }
     }
 
     return env.Undefined();
