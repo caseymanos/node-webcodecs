@@ -30,6 +30,11 @@ export interface VideoEncoderConfig {
   avc?: {
     format?: 'annexb' | 'avc';
   };
+  /**
+   * Use async (non-blocking) encoder. Defaults to true.
+   * Set to false to use synchronous encoder (blocks event loop during encoding).
+   */
+  useWorkerThread?: boolean;
 }
 
 export interface VideoEncoderInit {
@@ -59,12 +64,7 @@ export interface VideoEncoderSupport {
 }
 
 // Load native addon
-let native: any;
-try {
-  native = require('../build/Release/webcodecs_node.node');
-} catch {
-  native = null;
-}
+import { native } from './native';
 
 export class VideoEncoder {
   private _native: any;
@@ -75,12 +75,42 @@ export class VideoEncoder {
   private _config: VideoEncoderConfig | null = null;
   private _sentDecoderConfig: boolean = false;
   private _listeners: Map<string, Set<() => void>> = new Map();
+  private _useAsync: boolean = true;
+  private _nativeCreated: boolean = false;
 
   static async isConfigSupported(config: VideoEncoderConfig): Promise<VideoEncoderSupport> {
-    const supported = isVideoCodecSupported(config.codec) &&
-                      config.width > 0 &&
-                      config.height > 0;
-    return { supported, config };
+    // Basic validation first
+    if (!config.codec || config.width <= 0 || config.height <= 0) {
+      return { supported: false, config };
+    }
+
+    // Check codec string format
+    if (!isVideoCodecSupported(config.codec)) {
+      return { supported: false, config };
+    }
+
+    // If native probing is available, use it to actually test codec support
+    if (native?.CapabilityProbe?.probeVideoEncoder) {
+      try {
+        const ffmpegCodec = getFFmpegVideoCodec(config.codec);
+        const result = native.CapabilityProbe.probeVideoEncoder({
+          codec: ffmpegCodec,
+          width: config.width,
+          height: config.height,
+          hardwareAcceleration: config.hardwareAcceleration || 'no-preference',
+        });
+
+        return {
+          supported: result.supported,
+          config,
+        };
+      } catch {
+        // Fall back to basic check on error
+      }
+    }
+
+    // Fallback to basic string check
+    return { supported: true, config };
   }
 
   constructor(init: VideoEncoderInit) {
@@ -94,12 +124,7 @@ export class VideoEncoder {
     this._outputCallback = init.output;
     this._errorCallback = init.error;
 
-    if (native) {
-      this._native = new native.VideoEncoderNative(
-        this._onChunk.bind(this),
-        this._onError.bind(this)
-      );
-    }
+    // Defer native creation to configure() so we know whether to use async or sync
   }
 
   get state(): CodecState {
@@ -190,6 +215,26 @@ export class VideoEncoder {
 
     if (!native) {
       throw new DOMException('Native addon not available', 'NotSupportedError');
+    }
+
+    // Determine whether to use async (non-blocking) encoder
+    // Default to async unless explicitly disabled
+    this._useAsync = config.useWorkerThread !== false && !!native.VideoEncoderAsync;
+
+    // Create native encoder if not already created, or if switching mode
+    if (!this._nativeCreated) {
+      if (this._useAsync) {
+        this._native = new native.VideoEncoderAsync(
+          this._onChunk.bind(this),
+          this._onError.bind(this)
+        );
+      } else {
+        this._native = new native.VideoEncoderNative(
+          this._onChunk.bind(this),
+          this._onError.bind(this)
+        );
+      }
+      this._nativeCreated = true;
     }
 
     const ffmpegCodec = getFFmpegVideoCodec(config.codec);

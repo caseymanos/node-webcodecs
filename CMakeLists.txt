@@ -26,6 +26,9 @@ set(SOURCE_FILES
     native/binding.cpp
     native/encoder.cpp
     native/decoder.cpp
+    native/async_encoder.cpp
+    native/async_decoder.cpp
+    native/capability_probe.cpp
     native/frame.cpp
     native/audio.cpp
     native/util.cpp

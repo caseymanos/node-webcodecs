@@ -71,12 +71,7 @@ export {
 export { CodecState, BufferSource, DOMRectReadOnly } from './types';
 
 // Native utilities (if available)
-let _native: any = null;
-try {
-  _native = require('../build/Release/webcodecs_node.node');
-} catch {
-  // Native addon not available
-}
+import { native as _native } from './native';
 
 /**
  * Get FFmpeg version information

@@ -7,12 +7,7 @@ import { VideoFrame } from './VideoFrame';
 import { DOMException, BufferSource } from './types';
 
 // Load native addon
-let native: any;
-try {
-  native = require('../build/Release/webcodecs_node.node');
-} catch {
-  native = null;
-}
+import { native } from './native';
 
 export interface ImageDecodeResult {
   image: VideoFrame;
@@ -33,13 +28,26 @@ export interface ImageDecoderInit {
   preferAnimation?: boolean;
 }
 
+/**
+ * Check if a value is a ReadableStream
+ */
+function isReadableStream(value: unknown): value is ReadableStream {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as any).getReader === 'function'
+  );
+}
+
 export class ImageDecoder {
   private _native: any;
   private _type: string;
-  private _complete: boolean;
+  private _complete: boolean = false;
   private _closed: boolean = false;
   private _completedPromise: Promise<void>;
   private _completedResolve!: () => void;
+  private _completedReject!: (error: Error) => void;
+  private _streamReader?: ReadableStreamDefaultReader<BufferSource>;
 
   /**
    * Check if a MIME type is supported for decoding
@@ -63,6 +71,18 @@ export class ImageDecoder {
       throw new DOMException('Native addon not available', 'NotSupportedError');
     }
 
+    this._type = init.type;
+    this._completedPromise = new Promise((resolve, reject) => {
+      this._completedResolve = resolve;
+      this._completedReject = reject;
+    });
+
+    // Handle ReadableStream
+    if (isReadableStream(init.data)) {
+      this._handleReadableStream(init.data as ReadableStream<BufferSource>);
+      return;
+    }
+
     // Handle BufferSource
     let dataBuffer: Buffer;
     if (init.data instanceof ArrayBuffer) {
@@ -70,27 +90,71 @@ export class ImageDecoder {
     } else if (ArrayBuffer.isView(init.data)) {
       dataBuffer = Buffer.from(init.data.buffer, init.data.byteOffset, init.data.byteLength);
     } else {
-      // ReadableStream
-      throw new TypeError('ReadableStream not yet supported');
+      throw new TypeError('Invalid data type: expected BufferSource or ReadableStream');
     }
 
-    this._type = init.type;
-    this._completedPromise = new Promise((resolve) => {
-      this._completedResolve = resolve;
-    });
+    this._initNative(dataBuffer);
+  }
 
+  /**
+   * Handle ReadableStream input by reading all chunks and concatenating them
+   */
+  private async _handleReadableStream(stream: ReadableStream<BufferSource>): Promise<void> {
+    this._streamReader = stream.getReader();
+    const chunks: Uint8Array[] = [];
+
+    try {
+      while (true) {
+        const { done, value } = await this._streamReader.read();
+
+        if (done) break;
+
+        // Convert BufferSource to Uint8Array
+        let chunk: Uint8Array;
+        if (value instanceof ArrayBuffer) {
+          chunk = new Uint8Array(value);
+        } else if (ArrayBuffer.isView(value)) {
+          chunk = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+        } else {
+          throw new TypeError('ReadableStream yielded invalid chunk type');
+        }
+
+        chunks.push(chunk);
+      }
+
+      // Concatenate all chunks
+      const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+      const fullData = new Uint8Array(totalLength);
+      let offset = 0;
+      for (const chunk of chunks) {
+        fullData.set(chunk, offset);
+        offset += chunk.length;
+      }
+
+      this._initNative(Buffer.from(fullData));
+    } catch (error) {
+      this._completedReject(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+
+  /**
+   * Initialize the native decoder with buffer data
+   */
+  private _initNative(dataBuffer: Buffer): void {
     try {
       this._native = new native.ImageDecoderNative({
         data: dataBuffer,
-        type: init.type,
+        type: this._type,
       });
-    } catch (e: any) {
-      throw new DOMException(e.message || 'Failed to create ImageDecoder', 'NotSupportedError');
-    }
 
-    this._complete = this._native.complete;
-    if (this._complete) {
-      this._completedResolve();
+      this._complete = this._native.complete;
+      if (this._complete) {
+        this._completedResolve();
+      }
+    } catch (e: any) {
+      const error = new DOMException(e.message || 'Failed to create ImageDecoder', 'NotSupportedError');
+      this._completedReject(error);
+      throw error;
     }
   }
 

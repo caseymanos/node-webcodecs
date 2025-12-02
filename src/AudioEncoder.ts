@@ -38,12 +38,7 @@ export interface AudioEncoderSupport {
 }
 
 // Load native addon
-let native: any;
-try {
-  native = require('../build/Release/webcodecs_node.node');
-} catch {
-  native = null;
-}
+import { native } from './native';
 
 export class AudioEncoder {
   private _native: any;

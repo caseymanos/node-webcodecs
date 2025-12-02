@@ -57,13 +57,7 @@ export interface VideoFrameCopyToOptions {
 }
 
 // Load native addon
-let native: any;
-try {
-  native = require('../build/Release/webcodecs_node.node');
-} catch {
-  // Native addon not built yet - will fail at runtime if used
-  native = null;
-}
+import { native } from './native';
 
 export class VideoFrame {
   private _native: any;
