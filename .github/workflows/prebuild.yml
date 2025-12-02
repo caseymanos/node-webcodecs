@@ -19,7 +19,7 @@ jobs:
           - os: macos-14  # Apple Silicon
             arch: arm64
           # Linux
-          - os: ubuntu-22.04
+          - os: ubuntu-24.04
             arch: x64
           # Note: Linux arm64 would need self-hosted runner or QEMU
 
@@ -37,6 +37,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             libavcodec-dev \
+            libavformat-dev \
             libavutil-dev \
             libswscale-dev \
             libswresample-dev \
