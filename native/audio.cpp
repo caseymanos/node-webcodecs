@@ -512,7 +512,8 @@ void AudioEncoderNative::Configure(const Napi::CallbackInfo& info) {
     }
 
     codecCtx_->sample_rate = sampleRate_;
-    codecCtx_->time_base = { 1, sampleRate_ };
+    // WebCodecs timestamps are in microseconds, so use microsecond time_base
+    codecCtx_->time_base = { 1, 1000000 };
 
     // Select appropriate sample format for codec
     // Each codec has different requirements
@@ -653,9 +654,20 @@ void AudioEncoderNative::EmitChunk(Napi::Env env, AVPacket* packet) {
         extradataValue = Napi::Buffer<uint8_t>::Copy(env, codecCtx_->extradata, codecCtx_->extradata_size);
     }
 
+    // WebCodecs spec: output timestamps should match input timestamps (in microseconds).
+    // time_base is now {1, 1000000} so packet->pts is already in microseconds.
+    // FFmpeg adjusts timestamps by subtracting initial_padding (encoder priming delay).
+    // We need to add back the delay converted to microseconds.
+    int64_t timestampUs = packet->pts;
+    if (codecCtx_->initial_padding > 0) {
+        // Convert initial_padding from samples to microseconds
+        int64_t paddingUs = (int64_t)codecCtx_->initial_padding * 1000000 / codecCtx_->sample_rate;
+        timestampUs += paddingUs;
+    }
+
     outputCallback_.Value().Call({
         buffer,
-        Napi::Number::New(env, packet->pts),
+        Napi::Number::New(env, timestampUs),
         Napi::Number::New(env, packet->duration),
         extradataValue
     });
