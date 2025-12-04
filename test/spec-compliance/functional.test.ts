@@ -257,9 +257,7 @@ describe('Audio Encoding Functional Tests', () => {
     expect(metadata[0]).toHaveProperty('decoderConfig');
   });
 
-  // KNOWN BUG: Audio timestamps are incorrect due to time_base and initial_padding issues
-  // See separate PR for fix. Skipping until fix is merged.
-  it.skip('should preserve timestamps when encoding multiple audio frames', async () => {
+  it('should preserve timestamps when encoding multiple audio frames', async () => {
     if (!isWebCodecsAvailable()) {
       expect.fail('WebCodecs API not available');
     }
