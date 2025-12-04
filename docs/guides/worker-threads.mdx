@@ -1,0 +1,265 @@
+---
+title: "Worker Threads"
+description: "Parallel video encoding with Node.js worker threads"
+---
+
+## Overview
+
+Worker threads enable parallel video encoding by distributing work across multiple CPU cores. This is useful for:
+
+- **Batch processing** multiple videos simultaneously
+- **Multi-quality encoding** (ABR ladder)
+- **Keeping main thread responsive** during encoding
+- **Maximizing CPU utilization** on multi-core systems
+
+<Note>
+node-webcodecs encoders already use async mode by default, which offloads encoding to background threads. Worker threads are useful for processing **multiple videos** in parallel, not individual frames.
+</Note>
+
+## Basic Worker Thread Setup
+
+```javascript
+// main.js
+const { Worker } = require('worker_threads');
+const path = require('path');
+
+async function encodeInWorker(videoData, config) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(path.join(__dirname, 'encoder-worker.js'), {
+      workerData: { videoData, config }
+    });
+
+    worker.on('message', (result) => {
+      resolve(result);
+    });
+
+    worker.on('error', reject);
+    worker.on('exit', (code) => {
+      if (code !== 0) {
+        reject(new Error(`Worker stopped with exit code ${code}`));
+      }
+    });
+  });
+}
+
+// Usage
+const result = await encodeInWorker(videoData, {
+  codec: 'avc1.42E01E',
+  width: 1920,
+  height: 1080,
+  bitrate: 5_000_000
+});
+
+console.log(`Encoded ${result.chunks.length} chunks`);
+```
+
+```javascript
+// encoder-worker.js
+const { parentPort, workerData } = require('worker_threads');
+const { VideoEncoder, VideoFrame } = require('node-webcodecs');
+
+async function encodeVideo() {
+  const { videoData, config } = workerData;
+  const chunks = [];
+
+  const encoder = new VideoEncoder({
+    output: (chunk) => {
+      const buffer = Buffer.alloc(chunk.byteLength);
+      chunk.copyTo(buffer);
+      chunks.push(buffer);
+    },
+    error: (err) => {
+      parentPort.postMessage({ error: err.message });
+    }
+  });
+
+  encoder.configure(config);
+
+  // Encode frames
+  for (const frameData of videoData) {
+    const frame = new VideoFrame(frameData.data, frameData.options);
+    encoder.encode(frame);
+    frame.close();
+  }
+
+  await encoder.flush();
+  encoder.close();
+
+  // Send result back to main thread
+  parentPort.postMessage({ chunks });
+}
+
+encodeVideo().catch(err => {
+  parentPort.postMessage({ error: err.message });
+});
+```
+
+## Parallel Multi-Video Encoding
+
+Encode multiple videos in parallel:
+
+```javascript
+const { Worker } = require('worker_threads');
+const path = require('path');
+
+async function encodeMultipleVideos(videoFiles) {
+  console.log(`Encoding ${videoFiles.length} videos in parallel...`);
+
+  const workers = videoFiles.map(file => {
+    return new Promise((resolve, reject) => {
+      const worker = new Worker(
+        path.join(__dirname, 'video-encoder-worker.js'),
+        { workerData: { inputFile: file } }
+      );
+
+      worker.on('message', resolve);
+      worker.on('error', reject);
+    });
+  });
+
+  const results = await Promise.all(workers);
+
+  console.log(`✓ Encoded ${results.length} videos`);
+  return results;
+}
+
+// Encode 4 videos at once
+const files = ['video1.mp4', 'video2.mp4', 'video3.mp4', 'video4.mp4'];
+await encodeMultipleVideos(files);
+```
+
+## Worker Pool Pattern
+
+Create a pool of workers for efficient batch processing:
+
+```javascript
+class WorkerPool {
+  constructor(workerScript, poolSize = 4) {
+    this.workerScript = workerScript;
+    this.poolSize = poolSize;
+    this.workers = [];
+    this.queue = [];
+    this.activeWorkers = 0;
+
+    for (let i = 0; i < poolSize; i++) {
+      this.workers.push(this.createWorker());
+    }
+  }
+
+  createWorker() {
+    return {
+      worker: null,
+      busy: false
+    };
+  }
+
+  async execute(data) {
+    return new Promise((resolve, reject) => {
+      this.queue.push({ data, resolve, reject });
+      this.processQueue();
+    });
+  }
+
+  processQueue() {
+    if (this.queue.length === 0) return;
+
+    const availableWorker = this.workers.find(w => !w.busy);
+    if (!availableWorker) return;
+
+    const task = this.queue.shift();
+    availableWorker.busy = true;
+
+    const worker = new Worker(this.workerScript, {
+      workerData: task.data
+    });
+
+    worker.on('message', (result) => {
+      availableWorker.busy = false;
+      task.resolve(result);
+      this.processQueue();
+    });
+
+    worker.on('error', (err) => {
+      availableWorker.busy = false;
+      task.reject(err);
+      this.processQueue();
+    });
+
+    availableWorker.worker = worker;
+  }
+
+  async close() {
+    for (const { worker } of this.workers) {
+      if (worker) {
+        await worker.terminate();
+      }
+    }
+  }
+}
+
+// Usage
+const pool = new WorkerPool('./encoder-worker.js', 4);
+
+const tasks = videos.map(video =>
+  pool.execute({ video, config })
+);
+
+const results = await Promise.all(tasks);
+await pool.close();
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Limit worker count">
+    ```javascript
+    const os = require('os');
+    const cpuCount = os.cpus().length;
+
+    // Use CPU count - 1 to keep main thread responsive
+    const workerCount = Math.max(1, cpuCount - 1);
+    ```
+  </Accordion>
+
+  <Accordion title="Clean up workers">
+    Always terminate workers when done:
+    ```javascript
+    worker.on('message', (result) => {
+      // Process result
+      worker.terminate();  // ← Clean up
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Handle errors gracefully">
+    ```javascript
+    worker.on('error', (err) => {
+      console.error('Worker error:', err);
+      worker.terminate();
+    });
+
+    worker.on('exit', (code) => {
+      if (code !== 0) {
+        console.error(`Worker exited with code ${code}`);
+      }
+    });
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Backpressure" icon="gauge" href="/guides/backpressure">
+    Manage encoding queue
+  </Card>
+  <Card title="Hardware Acceleration" icon="microchip" href="/guides/hardware-acceleration">
+    GPU-accelerated encoding
+  </Card>
+  <Card title="API Reference" icon="book" href="/api-reference/VideoEncoder">
+    VideoEncoder docs
+  </Card>
+  <Card title="Examples" icon="code" href="/examples/real-world">
+    Real-world examples
+  </Card>
+</CardGroup>

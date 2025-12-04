@@ -1,0 +1,543 @@
+---
+title: "Video Transcoding"
+description: "Convert video between codecs, resolutions, and formats"
+---
+
+## Overview
+
+Transcoding converts video from one format to another by decoding and re-encoding. Common use cases:
+
+- **Codec conversion** (H.264 → VP9, HEVC → H.264)
+- **Resolution changes** (4K → 1080p, upscaling)
+- **Bitrate optimization** (reduce file size)
+- **Format normalization** (standardize for platform)
+
+## Basic Transcode Pattern
+
+```javascript
+const { VideoEncoder, VideoDecoder, VideoFrame } = require('node-webcodecs');
+
+async function transcode(inputChunks, decoderConfig, outputConfig) {
+  const outputChunks = [];
+
+  // 1. Create encoder (output)
+  const encoder = new VideoEncoder({
+    output: (chunk, metadata) => {
+      const buffer = Buffer.alloc(chunk.byteLength);
+      chunk.copyTo(buffer);
+      outputChunks.push(buffer);
+    },
+    error: (err) => { throw err; }
+  });
+
+  encoder.configure(outputConfig);
+
+  // 2. Create decoder (input)
+  const decoder = new VideoDecoder({
+    output: (frame) => {
+      // Re-encode each decoded frame
+      encoder.encode(frame);
+      frame.close();
+    },
+    error: (err) => { throw err; }
+  });
+
+  decoder.configure(decoderConfig);
+
+  // 3. Decode and encode
+  for (const chunk of inputChunks) {
+    decoder.decode(chunk);
+  }
+
+  await decoder.flush();
+  decoder.close();
+
+  await encoder.flush();
+  encoder.close();
+
+  return outputChunks;
+}
+```
+
+## H.264 to VP9 Transcoding
+
+Convert H.264 to VP9 for better compression:
+
+```javascript
+const fs = require('fs');
+const { VideoEncoder, VideoDecoder, EncodedVideoChunk } = require('node-webcodecs');
+
+async function h264ToVP9(inputFile, outputFile) {
+  console.log('Transcoding H.264 → VP9...');
+
+  const outputChunks = [];
+  let frameCount = 0;
+
+  // Create VP9 encoder
+  const encoder = new VideoEncoder({
+    output: (chunk) => {
+      const buffer = Buffer.alloc(chunk.byteLength);
+      chunk.copyTo(buffer);
+      outputChunks.push(buffer);
+    },
+    error: (err) => { throw err; }
+  });
+
+  encoder.configure({
+    codec: 'vp09.00.10.08',  // VP9
+    width: 1920,
+    height: 1080,
+    bitrate: 4_000_000,  // 30% less than H.264 for same quality
+    framerate: 30
+  });
+
+  // Create H.264 decoder
+  const decoder = new VideoDecoder({
+    output: (frame) => {
+      frameCount++;
+      encoder.encode(frame, { keyFrame: frameCount % 30 === 1 });
+      frame.close();
+    },
+    error: (err) => { throw err; }
+  });
+
+  decoder.configure({
+    codec: 'avc1.42E01E',
+    codedWidth: 1920,
+    codedHeight: 1080
+  });
+
+  // Read and decode input
+  const h264Data = fs.readFileSync(inputFile);
+  const chunk = new EncodedVideoChunk({
+    type: 'key',
+    timestamp: 0,
+    data: h264Data
+  });
+
+  decoder.decode(chunk);
+  await decoder.flush();
+  decoder.close();
+
+  await encoder.flush();
+  encoder.close();
+
+  // Save VP9 output
+  const vp9Data = Buffer.concat(outputChunks);
+  fs.writeFileSync(outputFile, vp9Data);
+
+  console.log(`✓ Transcoded ${frameCount} frames`);
+  console.log(`  Input: ${h264Data.length} bytes (H.264)`);
+  console.log(`  Output: ${vp9Data.length} bytes (VP9)`);
+  console.log(`  Savings: ${((1 - vp9Data.length / h264Data.length) * 100).toFixed(1)}%`);
+}
+
+// Usage
+h264ToVP9('input.h264', 'output.vp9').catch(console.error);
+```
+
+## Resolution Changing
+
+Downscale 4K to 1080p:
+
+```javascript
+async function downscale4KTo1080p(input4K, output1080p) {
+  const outputChunks = [];
+
+  // 1080p encoder
+  const encoder = new VideoEncoder({
+    output: (chunk) => {
+      const buffer = Buffer.alloc(chunk.byteLength);
+      chunk.copyTo(buffer);
+      outputChunks.push(buffer);
+    },
+    error: (err) => { throw err; }
+  });
+
+  encoder.configure({
+    codec: 'avc1.42E01E',
+    width: 1920,   // ← 1080p
+    height: 1080,
+    bitrate: 8_000_000
+  });
+
+  // 4K decoder
+  const decoder = new VideoDecoder({
+    output: (frame) => {
+      // Get 4K pixel data
+      const size4K = frame.allocationSize({ format: 'RGBA' });
+      const pixels4K = new Uint8Array(size4K);
+      frame.copyTo(pixels4K);
+
+      // Resize to 1080p (simplified - use proper image library)
+      const pixels1080p = resizeImage(pixels4K, 3840, 2160, 1920, 1080);
+
+      // Create 1080p frame
+      const frame1080p = new VideoFrame(pixels1080p, {
+        format: 'RGBA',
+        codedWidth: 1920,
+        codedHeight: 1080,
+        timestamp: frame.timestamp
+      });
+
+      encoder.encode(frame1080p);
+      frame1080p.close();
+      frame.close();
+    },
+    error: (err) => { throw err; }
+  });
+
+  decoder.configure({
+    codec: 'avc1.64001F',
+    codedWidth: 3840,  // ← 4K
+    codedHeight: 2160
+  });
+
+  // Process input
+  for (const chunk of input4K) {
+    decoder.decode(chunk);
+  }
+
+  await decoder.flush();
+  decoder.close();
+
+  await encoder.flush();
+  encoder.close();
+
+  return outputChunks;
+}
+
+// Helper: Simple nearest-neighbor resize (use sharp or canvas for production)
+function resizeImage(srcPixels, srcW, srcH, dstW, dstH) {
+  const dst = new Uint8Array(dstW * dstH * 4);
+
+  for (let y = 0; y < dstH; y++) {
+    for (let x = 0; x < dstW; x++) {
+      const srcX = Math.floor(x * srcW / dstW);
+      const srcY = Math.floor(y * srcH / dstH);
+
+      const srcIdx = (srcY * srcW + srcX) * 4;
+      const dstIdx = (y * dstW + x) * 4;
+
+      dst[dstIdx] = srcPixels[srcIdx];
+      dst[dstIdx + 1] = srcPixels[srcIdx + 1];
+      dst[dstIdx + 2] = srcPixels[srcIdx + 2];
+      dst[dstIdx + 3] = srcPixels[srcIdx + 3];
+    }
+  }
+
+  return dst;
+}
+```
+
+## Bitrate Reduction
+
+Reduce file size while maintaining acceptable quality:
+
+```javascript
+async function reduceBitrate(inputChunks, decoderConfig) {
+  const outputChunks = [];
+
+  const encoder = new VideoEncoder({
+    output: (chunk) => {
+      const buffer = Buffer.alloc(chunk.byteLength);
+      chunk.copyTo(buffer);
+      outputChunks.push(buffer);
+    },
+    error: (err) => { throw err; }
+  });
+
+  // Same codec, lower bitrate
+  encoder.configure({
+    codec: decoderConfig.codec,
+    width: decoderConfig.codedWidth,
+    height: decoderConfig.codedHeight,
+    bitrate: 2_000_000,  // ← Reduced from 5 Mbps to 2 Mbps
+    framerate: 30,
+    bitrateMode: 'variable'  // VBR for better quality at lower bitrate
+  });
+
+  const decoder = new VideoDecoder({
+    output: (frame) => {
+      encoder.encode(frame);
+      frame.close();
+    },
+    error: (err) => { throw err; }
+  });
+
+  decoder.configure(decoderConfig);
+
+  for (const chunk of inputChunks) {
+    decoder.decode(chunk);
+  }
+
+  await decoder.flush();
+  decoder.close();
+
+  await encoder.flush();
+  encoder.close();
+
+  return outputChunks;
+}
+```
+
+## Hardware-Accelerated Transcoding
+
+Use GPU for faster transcoding:
+
+```javascript
+async function hardwareTranscode(inputChunks, decoderConfig) {
+  const outputChunks = [];
+
+  // Check hardware encoder support
+  const hwConfig = {
+    codec: 'h264_videotoolbox',  // macOS
+    width: 1920,
+    height: 1080,
+    bitrate: 5_000_000,
+    hardwareAcceleration: 'prefer-hardware'
+  };
+
+  const support = await VideoEncoder.isConfigSupported(hwConfig);
+
+  const encoder = new VideoEncoder({
+    output: (chunk) => {
+      const buffer = Buffer.alloc(chunk.byteLength);
+      chunk.copyTo(buffer);
+      outputChunks.push(buffer);
+    },
+    error: (err) => { throw err; }
+  });
+
+  if (support.supported) {
+    console.log('✓ Using hardware encoder');
+    encoder.configure(hwConfig);
+  } else {
+    console.log('⚠ Hardware encoder unavailable, using software');
+    encoder.configure({
+      codec: 'avc1.42E01E',
+      width: 1920,
+      height: 1080,
+      bitrate: 5_000_000
+    });
+  }
+
+  const decoder = new VideoDecoder({
+    output: (frame) => {
+      encoder.encode(frame);
+      frame.close();
+    },
+    error: (err) => { throw err; }
+  });
+
+  decoder.configure(decoderConfig);
+
+  // Transcode
+  const startTime = Date.now();
+
+  for (const chunk of inputChunks) {
+    decoder.decode(chunk);
+  }
+
+  await decoder.flush();
+  decoder.close();
+
+  await encoder.flush();
+  encoder.close();
+
+  const elapsed = Date.now() - startTime;
+  console.log(`Transcoded in ${elapsed}ms`);
+
+  return outputChunks;
+}
+```
+
+## Adaptive Bitrate Transcoding
+
+Generate multiple qualities for streaming:
+
+```javascript
+async function createABRLadder(inputChunks, decoderConfig) {
+  // Define quality ladder
+  const qualities = [
+    { name: '1080p', width: 1920, height: 1080, bitrate: 8_000_000 },
+    { name: '720p',  width: 1280, height: 720,  bitrate: 5_000_000 },
+    { name: '480p',  width: 854,  height: 480,  bitrate: 2_500_000 },
+    { name: '360p',  width: 640,  height: 360,  bitrate: 1_000_000 }
+  ];
+
+  const outputs = {};
+
+  // Create encoder for each quality
+  const encoders = qualities.map(quality => {
+    outputs[quality.name] = [];
+
+    const encoder = new VideoEncoder({
+      output: (chunk) => {
+        const buffer = Buffer.alloc(chunk.byteLength);
+        chunk.copyTo(buffer);
+        outputs[quality.name].push(buffer);
+      },
+      error: (err) => { throw err; }
+    });
+
+    encoder.configure({
+      codec: 'avc1.42E01E',
+      width: quality.width,
+      height: quality.height,
+      bitrate: quality.bitrate,
+      framerate: 30
+    });
+
+    return { encoder, quality };
+  });
+
+  // Decode once, encode to multiple qualities
+  const decoder = new VideoDecoder({
+    output: (frame) => {
+      // Get pixel data
+      const size = frame.allocationSize({ format: 'RGBA' });
+      const pixels = new Uint8Array(size);
+      frame.copyTo(pixels);
+
+      // Encode to each quality
+      for (const { encoder, quality } of encoders) {
+        const resized = resizeImage(
+          pixels,
+          decoderConfig.codedWidth,
+          decoderConfig.codedHeight,
+          quality.width,
+          quality.height
+        );
+
+        const resizedFrame = new VideoFrame(resized, {
+          format: 'RGBA',
+          codedWidth: quality.width,
+          codedHeight: quality.height,
+          timestamp: frame.timestamp
+        });
+
+        encoder.encode(resizedFrame);
+        resizedFrame.close();
+      }
+
+      frame.close();
+    },
+    error: (err) => { throw err; }
+  });
+
+  decoder.configure(decoderConfig);
+
+  // Process
+  for (const chunk of inputChunks) {
+    decoder.decode(chunk);
+  }
+
+  await decoder.flush();
+  decoder.close();
+
+  // Flush all encoders
+  for (const { encoder, quality } of encoders) {
+    await encoder.flush();
+    encoder.close();
+    console.log(`✓ ${quality.name}: ${outputs[quality.name].length} chunks`);
+  }
+
+  return outputs;
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Choose appropriate target bitrate">
+    ```javascript
+    // Too low = quality loss
+    bitrate: 500_000  // ✗ Too low for 1080p
+
+    // Too high = large files
+    bitrate: 20_000_000  // ✗ Too high for 1080p
+
+    // Balanced
+    bitrate: 5_000_000  // ✓ Good for 1080p H.264
+    bitrate: 3_500_000  // ✓ Good for 1080p VP9
+    ```
+  </Accordion>
+
+  <Accordion title="Use hardware acceleration">
+    Hardware transcoding is 8-15x faster:
+
+    ```javascript
+    codec: 'h264_videotoolbox'  // macOS
+    codec: 'h264_nvenc'         // NVIDIA
+    codec: 'h264_qsv'           // Intel
+    ```
+  </Accordion>
+
+  <Accordion title="Preserve timestamps">
+    Always use source timestamps:
+
+    ```javascript
+    decoder.output = (frame) => {
+      const newFrame = processFrame(frame);
+      newFrame.timestamp = frame.timestamp;  // ← Preserve
+      encoder.encode(newFrame);
+    };
+    ```
+  </Accordion>
+
+  <Accordion title="Monitor progress">
+    ```javascript
+    let frameCount = 0;
+    const totalFrames = estimateTotalFrames();
+
+    decoder.output = (frame) => {
+      frameCount++;
+      if (frameCount % 30 === 0) {
+        const progress = (frameCount / totalFrames * 100).toFixed(1);
+        console.log(`Progress: ${progress}%`);
+      }
+      // ... process frame ...
+    };
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Common Issues
+
+<Warning>
+**Quality Loss**
+
+Multiple transcoding passes degrade quality. Avoid:
+```
+Source → Transcode 1 → Transcode 2 → Transcode 3
+```
+
+Instead, transcode once from highest quality source.
+</Warning>
+
+<Warning>
+**Sync Issues**
+
+If audio/video get out of sync:
+- Preserve exact timestamps
+- Don't drop frames
+- Match source framerate
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Hardware Acceleration" icon="microchip" href="/guides/hardware-acceleration">
+    Speed up transcoding 8-15x
+  </Card>
+  <Card title="Watermarking" icon="stamp" href="/cookbook/watermark">
+    Add logos during transcode
+  </Card>
+  <Card title="Thumbnails" icon="image" href="/cookbook/thumbnails">
+    Extract frames during transcode
+  </Card>
+  <Card title="Examples" icon="code" href="/examples/real-world">
+    Production transcoding
+  </Card>
+</CardGroup>

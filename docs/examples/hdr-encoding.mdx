@@ -1,0 +1,118 @@
+---
+title: "HDR Encoding Example"
+description: "Complete example of HDR10 video encoding"
+---
+
+## Complete HDR10 Example
+
+```javascript
+const { VideoEncoder, VideoFrame } = require('node-webcodecs');
+const fs = require('fs');
+
+async function encodeHDR10Video() {
+  console.log('Encoding 4K HDR10 video...');
+
+  const chunks = [];
+
+  const encoder = new VideoEncoder({
+    output: (chunk, metadata) => {
+      const buffer = Buffer.alloc(chunk.byteLength);
+      chunk.copyTo(buffer);
+      chunks.push(buffer);
+
+      if (metadata?.decoderConfig) {
+        console.log('HDR Config:', metadata.decoderConfig.codec);
+      }
+    },
+    error: (err) => {
+      console.error('Error:', err);
+      throw err;
+    }
+  });
+
+  // HDR10 configuration
+  encoder.configure({
+    codec: 'hevc_videotoolbox',  // HEVC for HDR
+    width: 3840,
+    height: 2160,
+    bitrate: 25_000_000,
+    framerate: 30,
+    hardwareAcceleration: 'prefer-hardware',
+
+    // HDR10 color space (BT.2020 + PQ)
+    colorSpace: {
+      primaries: 'bt2020',
+      transfer: 'pq',
+      matrix: 'bt2020-ncl',
+      fullRange: false
+    }
+  });
+
+  // Encode 60 frames (2 seconds)
+  for (let i = 0; i < 60; i++) {
+    const data = createHDRFrame(3840, 2160, i);
+
+    const frame = new VideoFrame(data, {
+      format: 'RGBA',
+      codedWidth: 3840,
+      codedHeight: 2160,
+      timestamp: i * 33333,
+      colorSpace: {
+        primaries: 'bt2020',
+        transfer: 'pq',
+        matrix: 'bt2020-ncl'
+      }
+    });
+
+    encoder.encode(frame, { keyFrame: i % 30 === 0 });
+    frame.close();
+
+    if ((i + 1) % 10 === 0) {
+      console.log(`  Progress: ${i + 1}/60 frames`);
+    }
+  }
+
+  await encoder.flush();
+  encoder.close();
+
+  const output = Buffer.concat(chunks);
+  fs.writeFileSync('hdr10_output.hevc', output);
+
+  console.log(`✓ Encoded ${output.length} bytes`);
+  console.log('Verify: ffprobe -show_streams hdr10_output.hevc');
+}
+
+function createHDRFrame(width, height, frameNum) {
+  const data = new Uint8Array(width * height * 4);
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+
+      // HDR gradient
+      const brightness = ((x / width) + (frameNum / 60)) % 1.0;
+      const value = Math.floor(brightness * 255);
+
+      data[idx] = value;
+      data[idx + 1] = Math.floor(value * 0.8);
+      data[idx + 2] = Math.floor(value * 0.6);
+      data[idx + 3] = 255;
+    }
+  }
+
+  return data;
+}
+
+encodeHDR10Video().catch(console.error);
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="HDR Guide" icon="sun" href="/guides/hdr-encoding">
+    Complete HDR documentation
+  </Card>
+  <Card title="Hardware Acceleration" icon="microchip" href="/guides/hardware-acceleration">
+    GPU-accelerated HDR
+  </Card>
+</CardGroup>

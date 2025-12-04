@@ -1,0 +1,429 @@
+---
+title: "Cookbook Overview"
+description: "Real-world recipes for common video encoding tasks"
+---
+
+## What's in the Cookbook?
+
+This cookbook provides practical, production-ready recipes for common video encoding tasks using node-webcodecs. Each recipe includes complete working code, explanations, and best practices.
+
+## Recipes
+
+<CardGroup cols={2}>
+  <Card title="Video Transcoding" icon="arrows-rotate" href="/cookbook/transcode">
+    Convert between formats and codecs
+    - H.264 to VP9
+    - Resolution changes
+    - Bitrate optimization
+  </Card>
+
+  <Card title="Video Watermarking" icon="stamp" href="/cookbook/watermark">
+    Add logos and text overlays
+    - Image watermarks
+    - Text overlays
+    - Positioning and scaling
+  </Card>
+
+  <Card title="Thumbnail Generation" icon="image" href="/cookbook/thumbnails">
+    Extract frames as images
+    - First frame extraction
+    - Multiple thumbnails
+    - Scene detection
+  </Card>
+
+  <Card title="WebRTC Recording" icon="record-vinyl" href="/cookbook/webrtc-recording">
+    Record video from WebRTC streams
+    - MediaStream capture
+    - Real-time encoding
+    - Live streaming
+  </Card>
+
+  <Card title="Video Validation" icon="check-circle" href="/cookbook/video-validation">
+    Verify video properties
+    - Codec detection
+    - Resolution validation
+    - Duration checking
+  </Card>
+</CardGroup>
+
+## Quick Reference
+
+### Common Patterns
+
+<AccordionGroup>
+  <Accordion title="Basic Encode Pattern">
+    ```javascript
+    const encoder = new VideoEncoder({
+      output: (chunk) => { /* save chunk */ },
+      error: (err) => { throw err; }
+    });
+
+    encoder.configure({
+      codec: 'avc1.42E01E',
+      width: 1920,
+      height: 1080,
+      bitrate: 5_000_000
+    });
+
+    for (const frame of frames) {
+      encoder.encode(frame);
+      frame.close();
+    }
+
+    await encoder.flush();
+    encoder.close();
+    ```
+  </Accordion>
+
+  <Accordion title="Basic Decode Pattern">
+    ```javascript
+    const decoder = new VideoDecoder({
+      output: (frame) => {
+        // Process decoded frame
+        frame.close();
+      },
+      error: (err) => { throw err; }
+    });
+
+    decoder.configure({
+      codec: 'avc1.42E01E',
+      codedWidth: 1920,
+      codedHeight: 1080,
+      description: decoderConfig.description
+    });
+
+    for (const chunk of chunks) {
+      decoder.decode(chunk);
+    }
+
+    await decoder.flush();
+    decoder.close();
+    ```
+  </Accordion>
+
+  <Accordion title="Encode-Decode Roundtrip">
+    ```javascript
+    // 1. Encode
+    const encodedChunks = [];
+    let decoderConfig = null;
+
+    const encoder = new VideoEncoder({
+      output: (chunk, metadata) => {
+        encodedChunks.push(chunk);
+        if (metadata?.decoderConfig) {
+          decoderConfig = metadata.decoderConfig;
+        }
+      },
+      error: (err) => { throw err; }
+    });
+
+    encoder.configure({ /* config */ });
+    // ... encode frames ...
+    await encoder.flush();
+    encoder.close();
+
+    // 2. Decode
+    const decoder = new VideoDecoder({
+      output: (frame) => {
+        // Process frame
+        frame.close();
+      },
+      error: (err) => { throw err; }
+    });
+
+    decoder.configure(decoderConfig);
+    for (const chunk of encodedChunks) {
+      decoder.decode(chunk);
+    }
+    await decoder.flush();
+    decoder.close();
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Common Operations
+
+<Tabs>
+  <Tab title="Read Video File">
+    ```javascript
+    const fs = require('fs');
+    const { VideoDecoder } = require('node-webcodecs');
+
+    // Read encoded video file
+    const videoData = fs.readFileSync('input.h264');
+
+    // Parse into chunks (simplified)
+    const chunk = new EncodedVideoChunk({
+      type: 'key',
+      timestamp: 0,
+      data: videoData
+    });
+
+    decoder.decode(chunk);
+    ```
+  </Tab>
+
+  <Tab title="Write Video File">
+    ```javascript
+    const fs = require('fs');
+
+    const chunks = [];
+
+    const encoder = new VideoEncoder({
+      output: (chunk) => {
+        const buffer = Buffer.alloc(chunk.byteLength);
+        chunk.copyTo(buffer);
+        chunks.push(buffer);
+      },
+      error: (err) => { throw err; }
+    });
+
+    // ... encode ...
+
+    await encoder.flush();
+    encoder.close();
+
+    // Write to file
+    const output = Buffer.concat(chunks);
+    fs.writeFileSync('output.h264', output);
+    ```
+  </Tab>
+
+  <Tab title="Process Frames">
+    ```javascript
+    const { VideoFrame } = require('node-webcodecs');
+
+    // Read frame data
+    const frame = new VideoFrame(rgbaBuffer, {
+      format: 'RGBA',
+      codedWidth: 1920,
+      codedHeight: 1080,
+      timestamp: 0
+    });
+
+    // Process (example: get pixel data)
+    const size = frame.allocationSize({ format: 'RGBA' });
+    const pixelData = new Uint8Array(size);
+    frame.copyTo(pixelData);
+
+    // Always close!
+    frame.close();
+    ```
+  </Tab>
+
+  <Tab title="Change Resolution">
+    ```javascript
+    // Decode at original resolution
+    decoder.configure({
+      codec: 'avc1.42E01E',
+      codedWidth: 3840,  // 4K
+      codedHeight: 2160
+    });
+
+    decoder.output = (frame) => {
+      // Get pixel data
+      const size = frame.allocationSize({ format: 'RGBA' });
+      const pixels = new Uint8Array(size);
+      frame.copyTo(pixels);
+
+      // Resize to 1080p (use image library like sharp)
+      const resized = resizeImage(pixels, 3840, 2160, 1920, 1080);
+
+      // Re-encode at new resolution
+      const newFrame = new VideoFrame(resized, {
+        format: 'RGBA',
+        codedWidth: 1920,
+        codedHeight: 1080,
+        timestamp: frame.timestamp
+      });
+
+      encoder.encode(newFrame);
+      newFrame.close();
+      frame.close();
+    };
+    ```
+  </Tab>
+</Tabs>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Memory Management" icon="memory">
+    - Always call `frame.close()`
+    - Close immediately after use
+    - Monitor memory usage
+    - Process in batches
+  </Card>
+
+  <Card title="Error Handling" icon="triangle-exclamation">
+    - Implement error callbacks
+    - Validate inputs
+    - Check codec support
+    - Provide fallbacks
+  </Card>
+
+  <Card title="Performance" icon="gauge-high">
+    - Use hardware acceleration
+    - Batch process frames
+    - Manage queue size
+    - Profile bottlenecks
+  </Card>
+
+  <Card title="Quality" icon="star">
+    - Choose appropriate bitrate
+    - Match source resolution
+    - Test output quality
+    - Balance size vs quality
+  </Card>
+</CardGroup>
+
+## Code Style Guide
+
+### File Organization
+
+```javascript
+// 1. Imports
+const { VideoEncoder, VideoDecoder, VideoFrame } = require('node-webcodecs');
+const fs = require('fs');
+
+// 2. Configuration
+const CONFIG = {
+  codec: 'avc1.42E01E',
+  width: 1920,
+  height: 1080,
+  bitrate: 5_000_000
+};
+
+// 3. Main function
+async function main() {
+  // Implementation
+}
+
+// 4. Helper functions
+function createFrame(data) {
+  // ...
+}
+
+// 5. Run
+main().catch(console.error);
+```
+
+### Error Handling
+
+```javascript
+// ✅ Good: Comprehensive error handling
+const encoder = new VideoEncoder({
+  output: (chunk, metadata) => {
+    try {
+      processChunk(chunk, metadata);
+    } catch (err) {
+      console.error('Failed to process chunk:', err);
+    }
+  },
+  error: (err) => {
+    console.error('Encoder error:', err.message);
+    // Clean up, notify, etc.
+  }
+});
+
+try {
+  encoder.configure(config);
+  // ... encode ...
+  await encoder.flush();
+} catch (err) {
+  console.error('Encoding failed:', err);
+  throw err;
+} finally {
+  encoder.close();
+}
+```
+
+### Resource Cleanup
+
+```javascript
+// ✅ Good: Always clean up
+async function encodeVideo() {
+  const frames = [];
+  const encoder = new VideoEncoder({ /* ... */ });
+
+  try {
+    encoder.configure(config);
+
+    for (const frame of frames) {
+      encoder.encode(frame);
+      frame.close();  // ← Close immediately
+    }
+
+    await encoder.flush();
+  } finally {
+    encoder.close();  // ← Always close encoder
+  }
+}
+```
+
+## Testing Patterns
+
+### Unit Test Example
+
+```javascript
+const { VideoEncoder, VideoFrame } = require('node-webcodecs');
+const assert = require('assert');
+
+async function testBasicEncoding() {
+  let chunkCount = 0;
+
+  const encoder = new VideoEncoder({
+    output: (chunk) => {
+      chunkCount++;
+      assert(chunk.byteLength > 0, 'Chunk should have data');
+    },
+    error: (err) => {
+      throw err;
+    }
+  });
+
+  encoder.configure({
+    codec: 'avc1.42E01E',
+    width: 640,
+    height: 480,
+    bitrate: 1_000_000
+  });
+
+  // Encode one frame
+  const data = new Uint8Array(640 * 480 * 4).fill(255);
+  const frame = new VideoFrame(data, {
+    format: 'RGBA',
+    codedWidth: 640,
+    codedHeight: 480,
+    timestamp: 0
+  });
+
+  encoder.encode(frame);
+  frame.close();
+
+  await encoder.flush();
+  encoder.close();
+
+  assert(chunkCount > 0, 'Should produce at least one chunk');
+  console.log('✓ Test passed');
+}
+
+testBasicEncoding().catch(console.error);
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Transcode Video" icon="arrows-rotate" href="/cookbook/transcode">
+    Convert between codecs
+  </Card>
+  <Card title="Add Watermarks" icon="stamp" href="/cookbook/watermark">
+    Overlay logos and text
+  </Card>
+  <Card title="Generate Thumbnails" icon="image" href="/cookbook/thumbnails">
+    Extract video frames
+  </Card>
+  <Card title="Examples" icon="code" href="/examples/basic-encoding">
+    More code examples
+  </Card>
+</CardGroup>

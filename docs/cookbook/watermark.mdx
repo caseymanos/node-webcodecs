@@ -1,0 +1,310 @@
+---
+title: "Video Watermarking"
+description: "Add logos and text overlays to video"
+---
+
+## Overview
+
+Watermarking adds logos, text, or graphics to video frames. Common use cases:
+
+- **Brand identification** (company logo)
+- **Copyright protection** (watermark text)
+- **Timestamping** (date/time overlay)
+- **Attribution** (creator credits)
+
+## Prerequisites
+
+Install the `canvas` package for image/text rendering:
+
+```bash
+npm install canvas
+```
+
+## Add Logo Watermark
+
+```javascript
+const { VideoEncoder, VideoDecoder, VideoFrame } = require('node-webcodecs');
+const { createCanvas, loadImage } = require('canvas');
+const fs = require('fs');
+
+async function addLogoWatermark(inputChunks, decoderConfig, logoPath) {
+  const outputChunks = [];
+
+  // Load watermark logo
+  const logo = await loadImage(logoPath);
+  const logoWidth = 200;
+  const logoHeight = Math.floor(logo.height * (logoWidth / logo.width));
+
+  // Create encoder
+  const encoder = new VideoEncoder({
+    output: (chunk) => {
+      const buffer = Buffer.alloc(chunk.byteLength);
+      chunk.copyTo(buffer);
+      outputChunks.push(buffer);
+    },
+    error: (err) => { throw err; }
+  });
+
+  encoder.configure({
+    codec: decoderConfig.codec,
+    width: decoderConfig.codedWidth,
+    height: decoderConfig.codedHeight,
+    bitrate: 5_000_000
+  });
+
+  // Create decoder
+  const decoder = new VideoDecoder({
+    output: (frame) => {
+      // Get frame pixels
+      const size = frame.allocationSize({ format: 'RGBA' });
+      const pixels = new Uint8Array(size);
+      frame.copyTo(pixels);
+
+      // Create canvas
+      const canvas = createCanvas(frame.codedWidth, frame.codedHeight);
+      const ctx = canvas.getContext('2d');
+
+      // Draw original frame
+      const imageData = ctx.createImageData(frame.codedWidth, frame.codedHeight);
+      imageData.data.set(pixels);
+      ctx.putImageData(imageData, 0, 0);
+
+      // Draw logo watermark (bottom-right corner)
+      const x = frame.codedWidth - logoWidth - 20;
+      const y = frame.codedHeight - logoHeight - 20;
+      ctx.globalAlpha = 0.7;  // Semi-transparent
+      ctx.drawImage(logo, x, y, logoWidth, logoHeight);
+
+      // Get watermarked pixels
+      const watermarked = ctx.getImageData(0, 0, frame.codedWidth, frame.codedHeight);
+
+      // Create new frame
+      const newFrame = new VideoFrame(watermarked.data, {
+        format: 'RGBA',
+        codedWidth: frame.codedWidth,
+        codedHeight: frame.codedHeight,
+        timestamp: frame.timestamp
+      });
+
+      encoder.encode(newFrame);
+      newFrame.close();
+      frame.close();
+    },
+    error: (err) => { throw err; }
+  });
+
+  decoder.configure(decoderConfig);
+
+  // Process
+  for (const chunk of inputChunks) {
+    decoder.decode(chunk);
+  }
+
+  await decoder.flush();
+  decoder.close();
+
+  await encoder.flush();
+  encoder.close();
+
+  return Buffer.concat(outputChunks);
+}
+
+// Usage
+const output = await addLogoWatermark(chunks, config, 'logo.png');
+fs.writeFileSync('watermarked.h264', output);
+```
+
+## Add Text Watermark
+
+```javascript
+async function addTextWatermark(inputChunks, decoderConfig, text) {
+  const outputChunks = [];
+
+  const encoder = new VideoEncoder({
+    output: (chunk) => {
+      const buffer = Buffer.alloc(chunk.byteLength);
+      chunk.copyTo(buffer);
+      outputChunks.push(buffer);
+    },
+    error: (err) => { throw err; }
+  });
+
+  encoder.configure({
+    codec: decoderConfig.codec,
+    width: decoderConfig.codedWidth,
+    height: decoderConfig.codedHeight,
+    bitrate: 5_000_000
+  });
+
+  const decoder = new VideoDecoder({
+    output: (frame) => {
+      const size = frame.allocationSize({ format: 'RGBA' });
+      const pixels = new Uint8Array(size);
+      frame.copyTo(pixels);
+
+      const canvas = createCanvas(frame.codedWidth, frame.codedHeight);
+      const ctx = canvas.getContext('2d');
+
+      // Draw frame
+      const imageData = ctx.createImageData(frame.codedWidth, frame.codedHeight);
+      imageData.data.set(pixels);
+      ctx.putImageData(imageData, 0, 0);
+
+      // Draw text watermark
+      ctx.font = 'bold 48px Arial';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.lineWidth = 3;
+
+      // Center text at bottom
+      const textMetrics = ctx.measureText(text);
+      const x = (frame.codedWidth - textMetrics.width) / 2;
+      const y = frame.codedHeight - 40;
+
+      ctx.strokeText(text, x, y);
+      ctx.fillText(text, x, y);
+
+      // Encode watermarked frame
+      const watermarked = ctx.getImageData(0, 0, frame.codedWidth, frame.codedHeight);
+      const newFrame = new VideoFrame(watermarked.data, {
+        format: 'RGBA',
+        codedWidth: frame.codedWidth,
+        codedHeight: frame.codedHeight,
+        timestamp: frame.timestamp
+      });
+
+      encoder.encode(newFrame);
+      newFrame.close();
+      frame.close();
+    },
+    error: (err) => { throw err; }
+  });
+
+  decoder.configure(decoderConfig);
+
+  for (const chunk of inputChunks) {
+    decoder.decode(chunk);
+  }
+
+  await decoder.flush();
+  decoder.close();
+
+  await encoder.flush();
+  encoder.close();
+
+  return Buffer.concat(outputChunks);
+}
+
+// Usage
+const output = await addTextWatermark(chunks, config, '© 2024 Your Company');
+```
+
+## Animated Watermark
+
+Create a watermark that moves or changes over time:
+
+```javascript
+async function addAnimatedWatermark(inputChunks, decoderConfig) {
+  const outputChunks = [];
+  let frameCount = 0;
+
+  const encoder = new VideoEncoder({
+    output: (chunk) => {
+      const buffer = Buffer.alloc(chunk.byteLength);
+      chunk.copyTo(buffer);
+      outputChunks.push(buffer);
+    },
+    error: (err) => { throw err; }
+  });
+
+  encoder.configure({
+    codec: decoderConfig.codec,
+    width: decoderConfig.codedWidth,
+    height: decoderConfig.codedHeight,
+    bitrate: 5_000_000
+  });
+
+  const decoder = new VideoDecoder({
+    output: (frame) => {
+      const size = frame.allocationSize({ format: 'RGBA' });
+      const pixels = new Uint8Array(size);
+      frame.copyTo(pixels);
+
+      const canvas = createCanvas(frame.codedWidth, frame.codedHeight);
+      const ctx = canvas.getContext('2d');
+
+      // Draw frame
+      const imageData = ctx.createImageData(frame.codedWidth, frame.codedHeight);
+      imageData.data.set(pixels);
+      ctx.putImageData(imageData, 0, 0);
+
+      // Animated watermark (moves across screen)
+      const progress = (frameCount % 60) / 60;  // Loop every 2 seconds at 30fps
+      const x = progress * frame.codedWidth;
+      const y = 50;
+
+      // Draw watermark
+      ctx.font = 'bold 36px Arial';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+      ctx.shadowBlur = 5;
+      ctx.fillText('WATERMARK', x, y);
+
+      frameCount++;
+
+      // Encode
+      const watermarked = ctx.getImageData(0, 0, frame.codedWidth, frame.codedHeight);
+      const newFrame = new VideoFrame(watermarked.data, {
+        format: 'RGBA',
+        codedWidth: frame.codedWidth,
+        codedHeight: frame.codedHeight,
+        timestamp: frame.timestamp
+      });
+
+      encoder.encode(newFrame);
+      newFrame.close();
+      frame.close();
+    },
+    error: (err) => { throw err; }
+  });
+
+  decoder.configure(decoderConfig);
+
+  for (const chunk of inputChunks) {
+    decoder.decode(chunk);
+  }
+
+  await decoder.flush();
+  decoder.close();
+
+  await encoder.flush();
+  encoder.close();
+
+  return Buffer.concat(outputChunks);
+}
+```
+
+## Best Practices
+
+- Use **semi-transparent** watermarks (alpha 0.5-0.8)
+- Position in **corner** to avoid obscuring content
+- Keep **file size reasonable** (10-20% of frame size)
+- Use **high contrast** colors for visibility
+- Consider **animated** watermarks to prevent removal
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Transcoding" icon="arrows-rotate" href="/cookbook/transcode">
+    Combine with transcoding
+  </Card>
+  <Card title="Thumbnails" icon="image" href="/cookbook/thumbnails">
+    Extract watermarked frames
+  </Card>
+  <Card title="Examples" icon="code" href="/examples/basic-encoding">
+    More examples
+  </Card>
+  <Card title="API Reference" icon="book" href="/api-reference/VideoEncoder">
+    Encoder documentation
+  </Card>
+</CardGroup>

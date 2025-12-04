@@ -1,0 +1,505 @@
+---
+title: "First Decode"
+description: "Decode your first video stream with node-webcodecs"
+---
+
+## Your First Video Decode
+
+This tutorial will have you decoding video frames in under 5 minutes. We'll decode the H.264 video you created in the [Quick Start](/getting-started/quick-start) tutorial.
+
+<Steps>
+  <Step title="Prerequisites">
+    Make sure you've completed the [Quick Start](/getting-started/quick-start) tutorial and have:
+    - `node-webcodecs` installed
+    - An encoded video file (`output.h264`)
+    - Basic understanding of VideoEncoder
+
+    If you don't have an encoded video, run the Quick Start example first.
+  </Step>
+
+  <Step title="Create a decoder">
+    Create a file called `decode.js`:
+
+    ```javascript
+    const { VideoDecoder } = require('node-webcodecs');
+    const fs = require('fs');
+
+    // Storage for decoded frames
+    const frames = [];
+
+    // Create decoder
+    const decoder = new VideoDecoder({
+      output: (frame) => {
+        frames.push(frame);
+        console.log(`Decoded frame ${frames.length}:`);
+        console.log(`  Size: ${frame.codedWidth}x${frame.codedHeight}`);
+        console.log(`  Timestamp: ${frame.timestamp} μs`);
+        console.log(`  Format: ${frame.format}`);
+      },
+      error: (err) => console.error('Decoder error:', err)
+    });
+
+    console.log('Decoder created!');
+    ```
+  </Step>
+
+  <Step title="Configure the decoder">
+    Add configuration code:
+
+    ```javascript
+    // Configure for H.264
+    decoder.configure({
+      codec: 'avc1.42E01E',  // H.264 Baseline
+      codedWidth: 640,
+      codedHeight: 480,
+    });
+
+    console.log('Decoder configured for H.264 640x480');
+    ```
+
+    <Note>
+      The decoder configuration must match the encoder's output codec and dimensions.
+    </Note>
+  </Step>
+
+  <Step title="Decode the video">
+    Read and decode the H.264 file:
+
+    ```javascript
+    async function decodeVideo() {
+      // Read the encoded video file
+      const h264Data = fs.readFileSync('output.h264');
+
+      // In a real application, you'd parse the bitstream into chunks
+      // For this example, we'll create a single chunk
+      const { EncodedVideoChunk } = require('node-webcodecs');
+
+      const chunk = new EncodedVideoChunk({
+        type: 'key',  // First chunk is a keyframe
+        timestamp: 0,
+        data: h264Data
+      });
+
+      // Decode the chunk
+      decoder.decode(chunk);
+
+      // Wait for decoding to finish
+      await decoder.flush();
+
+      console.log(`\n✓ Decoded ${frames.length} frames`);
+      console.log(`✓ Total frames in memory: ${frames.length}`);
+
+      // Clean up
+      decoder.close();
+
+      // Don't forget to close frames when done!
+      frames.forEach(frame => frame.close());
+      console.log('✓ All frames closed, memory freed');
+    }
+
+    decodeVideo().catch(console.error);
+    ```
+  </Step>
+
+  <Step title="Run it!">
+    ```bash
+    node decode.js
+    ```
+
+    **Expected Output:**
+    ```
+    Decoder created!
+    Decoder configured for H.264 640x480
+    Decoded frame 1:
+      Size: 640x480
+      Timestamp: 0 μs
+      Format: I420
+    Decoded frame 2:
+      Size: 640x480
+      Timestamp: 33333 μs
+      Format: I420
+    ...
+    ✓ Decoded 30 frames
+    ✓ Total frames in memory: 30
+    ✓ All frames closed, memory freed
+    ```
+  </Step>
+</Steps>
+
+## Complete Encode/Decode Roundtrip
+
+Here's a complete example that encodes AND decodes in the same script:
+
+<CodeGroup>
+```javascript Complete Roundtrip
+const { VideoEncoder, VideoDecoder, VideoFrame, EncodedVideoChunk } = require('node-webcodecs');
+
+async function roundtripVideo() {
+  const encodedChunks = [];
+  const decodedFrames = [];
+  let decoderConfig = null;
+
+  // ===== ENCODING =====
+  console.log('1. Encoding frames...');
+
+  const encoder = new VideoEncoder({
+    output: (chunk, metadata) => {
+      encodedChunks.push(chunk);
+      if (metadata?.decoderConfig) {
+        decoderConfig = metadata.decoderConfig;
+        console.log('   Received decoder config:', decoderConfig.codec);
+      }
+    },
+    error: (err) => { throw err; }
+  });
+
+  encoder.configure({
+    codec: 'avc1.42E01E',
+    width: 320,
+    height: 240,
+    bitrate: 500_000,
+  });
+
+  // Encode 5 frames with different colors
+  const colors = [
+    [255, 0, 0],     // Red
+    [0, 255, 0],     // Green
+    [0, 0, 255],     // Blue
+    [255, 255, 0],   // Yellow
+    [255, 0, 255],   // Magenta
+  ];
+
+  for (let i = 0; i < colors.length; i++) {
+    const [r, g, b] = colors[i];
+    const data = new Uint8Array(320 * 240 * 4);
+
+    for (let j = 0; j < data.length; j += 4) {
+      data[j] = r;
+      data[j + 1] = g;
+      data[j + 2] = b;
+      data[j + 3] = 255;
+    }
+
+    const frame = new VideoFrame(data, {
+      format: 'RGBA',
+      codedWidth: 320,
+      codedHeight: 240,
+      timestamp: i * 33333,
+    });
+
+    encoder.encode(frame, { keyFrame: i === 0 });
+    frame.close();
+  }
+
+  await encoder.flush();
+  encoder.close();
+  console.log(`   Encoded ${encodedChunks.length} chunks\n`);
+
+  // ===== DECODING =====
+  console.log('2. Decoding chunks...');
+
+  const decoder = new VideoDecoder({
+    output: (frame) => {
+      decodedFrames.push(frame);
+      console.log(`   Frame ${decodedFrames.length}: ${frame.codedWidth}x${frame.codedHeight} @ ${frame.timestamp}μs`);
+    },
+    error: (err) => { throw err; }
+  });
+
+  decoder.configure({
+    codec: decoderConfig.codec,
+    codedWidth: decoderConfig.codedWidth,
+    codedHeight: decoderConfig.codedHeight,
+    description: decoderConfig.description,
+  });
+
+  for (const chunk of encodedChunks) {
+    decoder.decode(chunk);
+  }
+
+  await decoder.flush();
+  decoder.close();
+
+  // ===== SUMMARY =====
+  console.log('\n--- Summary ---');
+  console.log(`Encoded: ${encodedChunks.length} chunks`);
+  console.log(`Decoded: ${decodedFrames.length} frames`);
+
+  const totalSize = encodedChunks.reduce((sum, c) => sum + c.byteLength, 0);
+  const originalSize = 320 * 240 * 4 * colors.length;
+  console.log(`Compression: ${((1 - totalSize / originalSize) * 100).toFixed(1)}% reduction`);
+
+  // Clean up
+  decodedFrames.forEach(f => f.close());
+  console.log('✓ Roundtrip complete!');
+}
+
+roundtripVideo().catch(console.error);
+```
+
+```typescript TypeScript Version
+import { VideoEncoder, VideoDecoder, VideoFrame, EncodedVideoChunk } from 'node-webcodecs';
+
+async function roundtripVideo(): Promise<void> {
+  const encodedChunks: EncodedVideoChunk[] = [];
+  const decodedFrames: VideoFrame[] = [];
+  let decoderConfig: any = null;
+
+  // ===== ENCODING =====
+  console.log('1. Encoding frames...');
+
+  const encoder = new VideoEncoder({
+    output: (chunk, metadata) => {
+      encodedChunks.push(chunk);
+      if (metadata?.decoderConfig) {
+        decoderConfig = metadata.decoderConfig;
+      }
+    },
+    error: (err) => { throw err; }
+  });
+
+  encoder.configure({
+    codec: 'avc1.42E01E',
+    width: 320,
+    height: 240,
+    bitrate: 500_000,
+  });
+
+  const colors: [number, number, number][] = [
+    [255, 0, 0],     // Red
+    [0, 255, 0],     // Green
+    [0, 0, 255],     // Blue
+    [255, 255, 0],   // Yellow
+    [255, 0, 255],   // Magenta
+  ];
+
+  for (let i = 0; i < colors.length; i++) {
+    const [r, g, b] = colors[i];
+    const data = new Uint8Array(320 * 240 * 4);
+
+    for (let j = 0; j < data.length; j += 4) {
+      data[j] = r;
+      data[j + 1] = g;
+      data[j + 2] = b;
+      data[j + 3] = 255;
+    }
+
+    const frame = new VideoFrame(data, {
+      format: 'RGBA',
+      codedWidth: 320,
+      codedHeight: 240,
+      timestamp: i * 33333,
+    });
+
+    encoder.encode(frame, { keyFrame: i === 0 });
+    frame.close();
+  }
+
+  await encoder.flush();
+  encoder.close();
+
+  // ===== DECODING =====
+  const decoder = new VideoDecoder({
+    output: (frame) => {
+      decodedFrames.push(frame);
+    },
+    error: (err) => { throw err; }
+  });
+
+  decoder.configure({
+    codec: decoderConfig.codec,
+    codedWidth: decoderConfig.codedWidth,
+    codedHeight: decoderConfig.codedHeight,
+    description: decoderConfig.description,
+  });
+
+  for (const chunk of encodedChunks) {
+    decoder.decode(chunk);
+  }
+
+  await decoder.flush();
+  decoder.close();
+
+  // Clean up
+  decodedFrames.forEach(f => f.close());
+}
+
+roundtripVideo().catch(console.error);
+```
+</CodeGroup>
+
+## What Just Happened?
+
+<AccordionGroup>
+  <Accordion title="VideoDecoder setup">
+    ```javascript
+    const decoder = new VideoDecoder({
+      output: (frame) => { /* handle decoded frame */ },
+      error: (err) => { /* handle errors */ }
+    });
+    ```
+
+    The `output` callback receives:
+    - **frame**: `VideoFrame` containing decoded pixel data
+    - The frame is in a native format (usually `I420` or `NV12`)
+  </Accordion>
+
+  <Accordion title="Configuration">
+    ```javascript
+    decoder.configure({
+      codec: 'avc1.42E01E',
+      codedWidth: 640,
+      codedHeight: 480,
+      description: decoderConfig.description,  // From encoder metadata
+    });
+    ```
+
+    - **codec**: Must match the encoded video's codec
+    - **codedWidth/Height**: Must match the encoded dimensions
+    - **description**: Codec-specific configuration (SPS/PPS for H.264)
+  </Accordion>
+
+  <Accordion title="EncodedVideoChunk">
+    ```javascript
+    const chunk = new EncodedVideoChunk({
+      type: 'key',      // 'key' or 'delta'
+      timestamp: 0,     // microseconds
+      data: buffer      // Uint8Array or ArrayBuffer
+    });
+    ```
+
+    - **type**: `'key'` for keyframes (I-frames), `'delta'` for P/B-frames
+    - **timestamp**: Presentation timestamp in microseconds
+    - **data**: Raw encoded bitstream data
+  </Accordion>
+
+  <Accordion title="Decoder config from encoder">
+    ```javascript
+    const encoder = new VideoEncoder({
+      output: (chunk, metadata) => {
+        if (metadata?.decoderConfig) {
+          // This config can be passed directly to decoder.configure()
+          const config = metadata.decoderConfig;
+        }
+      }
+    });
+    ```
+
+    The encoder provides decoder configuration on the first keyframe. This contains:
+    - `codec`: Codec string
+    - `codedWidth`/`codedHeight`: Dimensions
+    - `description`: Codec extradata (SPS/PPS for H.264, etc.)
+  </Accordion>
+</AccordionGroup>
+
+## Working with Decoded Frames
+
+<Warning>
+**Always close decoded frames!**
+
+```javascript
+❌ Memory leak:
+const frame = await decodeFrame();
+// frame never closed
+
+✅ Correct:
+const frame = await decodeFrame();
+// ... use frame ...
+frame.close();
+```
+
+VideoFrame objects hold native memory that JavaScript's GC cannot see. Always call `.close()` when done.
+</Warning>
+
+### Accessing Pixel Data
+
+```javascript
+decoder.output = (frame) => {
+  // Get frame info
+  console.log(`Format: ${frame.format}`);  // Usually 'I420'
+  console.log(`Size: ${frame.codedWidth}x${frame.codedHeight}`);
+
+  // Copy pixel data to buffer
+  const size = frame.allocationSize({ format: frame.format });
+  const buffer = new Uint8Array(size);
+  frame.copyTo(buffer);
+
+  console.log(`Copied ${size} bytes of pixel data`);
+
+  // Always close when done!
+  frame.close();
+};
+```
+
+## Common Mistakes
+
+<Warning>
+**Wrong codec string**
+
+```javascript
+// Encoder uses:
+encoder.configure({ codec: 'avc1.42E01E', ... });
+
+❌ Decoder mismatch:
+decoder.configure({ codec: 'avc1.640028', ... });  // Different profile!
+
+✅ Use the same codec:
+decoder.configure({ codec: 'avc1.42E01E', ... });
+```
+</Warning>
+
+<Warning>
+**Missing description (extradata)**
+
+```javascript
+❌ Missing SPS/PPS:
+decoder.configure({
+  codec: 'avc1.42E01E',
+  codedWidth: 640,
+  codedHeight: 480,
+  // Missing description!
+});
+
+✅ Include description from encoder metadata:
+decoder.configure({
+  codec: 'avc1.42E01E',
+  codedWidth: 640,
+  codedHeight: 480,
+  description: decoderConfig.description,  // SPS/PPS
+});
+```
+
+For H.264/HEVC, the `description` field contains critical codec parameters (SPS/PPS). Without it, decoding will fail.
+</Warning>
+
+<Warning>
+**Not awaiting flush()**
+
+```javascript
+❌ Decoder closes before finishing:
+decoder.decode(chunk);
+decoder.close();  // May lose frames!
+
+✅ Wait for flush:
+decoder.decode(chunk);
+await decoder.flush();
+decoder.close();
+```
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="book" href="/api-reference/VideoDecoder">
+    Complete VideoDecoder documentation
+  </Card>
+  <Card title="Transcode Video" icon="arrows-rotate" href="/cookbook/transcode">
+    Learn to transcode between codecs
+  </Card>
+  <Card title="Real-World Demo" icon="video" href="/examples/real-world">
+    Process actual video files
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/troubleshooting/overview">
+    Common decoding issues
+  </Card>
+</CardGroup>

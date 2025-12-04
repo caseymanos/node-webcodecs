@@ -1,0 +1,150 @@
+---
+title: "Video Validation"
+description: "Verify video properties and codec support"
+---
+
+## Overview
+
+Validate video before processing:
+
+- Check codec compatibility
+- Verify resolution
+- Validate bitrate
+- Detect codec support
+
+## Check Codec Support
+
+```javascript
+const { VideoEncoder } = require('node-webcodecs');
+
+async function validateCodecSupport(codec, width, height) {
+  const result = await VideoEncoder.isConfigSupported({
+    codec,
+    width,
+    height
+  });
+
+  if (result.supported) {
+    console.log(`✓ ${codec} is supported at ${width}x${height}`);
+    return true;
+  } else {
+    console.log(`✗ ${codec} is NOT supported`);
+    return false;
+  }
+}
+
+// Usage
+await validateCodecSupport('avc1.42E01E', 1920, 1080);
+await validateCodecSupport('hevc_videotoolbox', 3840, 2160);
+```
+
+## Validate Resolution
+
+```javascript
+function validateResolution(width, height) {
+  const maxWidth = 7680;   // 8K
+  const maxHeight = 4320;
+  const minWidth = 128;
+  const minHeight = 128;
+
+  if (width < minWidth || height < minHeight) {
+    throw new Error(`Resolution too small: ${width}x${height}`);
+  }
+
+  if (width > maxWidth || height > maxHeight) {
+    throw new Error(`Resolution too large: ${width}x${height}`);
+  }
+
+  // Check multiple of 2
+  if (width % 2 !== 0 || height % 2 !== 0) {
+    throw new Error(`Resolution must be even: ${width}x${height}`);
+  }
+
+  return true;
+}
+```
+
+## Validate Bitrate
+
+```javascript
+function validateBitrate(bitrate, width, height, framerate = 30) {
+  const pixels = width * height;
+  const bitsPerPixel = bitrate / (pixels * framerate);
+
+  if (bitsPerPixel < 0.05) {
+    console.warn(`⚠️  Bitrate too low (${bitsPerPixel.toFixed(3)} bpp)`);
+    console.warn('   Quality may be poor');
+  }
+
+  if (bitsPerPixel > 1.0) {
+    console.warn(`⚠️  Bitrate very high (${bitsPerPixel.toFixed(3)} bpp)`);
+    console.warn('   File size will be large');
+  }
+
+  return true;
+}
+
+// Usage
+validateBitrate(5_000_000, 1920, 1080, 30);  // 0.086 bpp - OK
+```
+
+## Complete Validation
+
+```javascript
+async function validateVideoConfig(config) {
+  const errors = [];
+  const warnings = [];
+
+  // Check codec support
+  const support = await VideoEncoder.isConfigSupported(config);
+  if (!support.supported) {
+    errors.push(`Codec ${config.codec} is not supported`);
+  }
+
+  // Check resolution
+  if (config.width % 2 !== 0 || config.height % 2 !== 0) {
+    errors.push('Width and height must be even');
+  }
+
+  if (config.width > 7680 || config.height > 4320) {
+    errors.push('Resolution exceeds 8K');
+  }
+
+  // Check bitrate
+  if (config.bitrate) {
+    const bpp = config.bitrate / (config.width * config.height * (config.framerate || 30));
+    if (bpp < 0.05) {
+      warnings.push('Bitrate may be too low for good quality');
+    }
+  }
+
+  return { errors, warnings, valid: errors.length === 0 };
+}
+
+// Usage
+const result = await validateVideoConfig({
+  codec: 'avc1.42E01E',
+  width: 1920,
+  height: 1080,
+  bitrate: 5_000_000,
+  framerate: 30
+});
+
+if (!result.valid) {
+  console.error('Validation errors:', result.errors);
+}
+if (result.warnings.length > 0) {
+  console.warn('Warnings:', result.warnings);
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="book" href="/api-reference/VideoEncoder">
+    Encoder documentation
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/troubleshooting/overview">
+    Common issues
+  </Card>
+</CardGroup>

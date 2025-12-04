@@ -1,0 +1,104 @@
+---
+title: "WebRTC Recording"
+description: "Record video from WebRTC streams and MediaStreams"
+---
+
+## Overview
+
+Record video from WebRTC/MediaStream sources:
+
+- Video conferencing recordings
+- Screen recordings
+- Camera feeds
+- Live streaming archives
+
+<Note>
+This guide shows the encoding side. For capturing MediaStream data in Node.js, you'll need platform-specific capture tools or receive data from a browser.
+</Note>
+
+## Basic MediaStream Recording
+
+```javascript
+const { VideoEncoder, VideoFrame } = require('node-webcodecs');
+
+async function recordMediaStream(mediaStreamFrames) {
+  const chunks = [];
+
+  const encoder = new VideoEncoder({
+    output: (chunk) => {
+      const buffer = Buffer.alloc(chunk.byteLength);
+      chunk.copyTo(buffer);
+      chunks.push(buffer);
+    },
+    error: (err) => { throw err; }
+  });
+
+  encoder.configure({
+    codec: 'avc1.42E01E',
+    width: 1920,
+    height: 1080,
+    bitrate: 5_000_000,
+    framerate: 30,
+    latencyMode: 'realtime'  // Low latency for live recording
+  });
+
+  for (const frameData of mediaStreamFrames) {
+    const frame = new VideoFrame(frameData.data, {
+      format: 'RGBA',
+      codedWidth: 1920,
+      codedHeight: 1080,
+      timestamp: frameData.timestamp
+    });
+
+    encoder.encode(frame);
+    frame.close();
+  }
+
+  await encoder.flush();
+  encoder.close();
+
+  return Buffer.concat(chunks);
+}
+```
+
+## Real-Time Encoding
+
+For live streams, use real-time encoding mode:
+
+```javascript
+const encoder = new VideoEncoder({
+  output: (chunk) => {
+    // Send to live stream server
+    streamServer.send(chunk);
+  },
+  error: (err) => { throw err; }
+});
+
+encoder.configure({
+  codec: 'avc1.42E01E',
+  width: 1280,
+  height: 720,
+  bitrate: 3_000_000,
+  framerate: 30,
+  latencyMode: 'realtime',  // ← Optimize for low latency
+  bitrateMode: 'constant'   // ← CBR for streaming
+});
+```
+
+## Best Practices
+
+- Use **realtime** latency mode
+- Use **constant bitrate** (CBR)
+- Handle **dropped frames** gracefully
+- **Buffer** output to handle network jitter
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Transcoding" icon="arrows-rotate" href="/cookbook/transcode">
+    Convert recorded streams
+  </Card>
+  <Card title="Examples" icon="code" href="/examples/basic-encoding">
+    More examples
+  </Card>
+</CardGroup>

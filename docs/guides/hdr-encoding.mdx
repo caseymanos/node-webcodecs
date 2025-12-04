@@ -1,0 +1,580 @@
+---
+title: "HDR Video Encoding"
+description: "Encode High Dynamic Range video with BT.2020, PQ, and HLG"
+---
+
+## Overview
+
+High Dynamic Range (HDR) video captures a wider range of brightness and colors than Standard Dynamic Range (SDR), providing:
+
+- **Brighter highlights** (up to 10,000 nits vs 100 nits for SDR)
+- **Deeper blacks** with more shadow detail
+- **Wider color gamut** (BT.2020 vs BT.709)
+- **More realistic** and immersive viewing experience
+
+node-webcodecs supports HDR encoding through color space metadata configuration.
+
+## HDR Standards
+
+<CardGroup cols={2}>
+  <Card title="HDR10" icon="tv">
+    **Most Common HDR Format**
+    - BT.2020 color primaries
+    - PQ (ST.2084) transfer function
+    - 10-bit color depth
+    - Static metadata
+  </Card>
+  <Card title="HLG" icon="broadcast-tower">
+    **Broadcast HDR**
+    - BT.2020 color primaries
+    - HLG transfer function
+    - Backward compatible with SDR
+    - No metadata needed
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Dolby Vision" icon="star">
+    **Premium HDR**
+    - Dynamic metadata
+    - Proprietary encoding
+    - Best quality
+    - Limited support
+  </Card>
+  <Card title="HDR10+" icon="plus">
+    **Enhanced HDR10**
+    - Dynamic metadata
+    - Scene-by-scene optimization
+    - Open standard
+    - Growing support
+  </Card>
+</CardGroup>
+
+## Quick Start: HDR10 Encoding
+
+```javascript
+const { VideoEncoder, VideoFrame } = require('node-webcodecs');
+
+const encoder = new VideoEncoder({
+  output: (chunk, metadata) => {
+    // Handle encoded HDR chunk
+  },
+  error: (err) => console.error(err)
+});
+
+// Configure for HDR10 (BT.2020 + PQ)
+encoder.configure({
+  codec: 'hevc_videotoolbox',  // HEVC recommended for HDR
+  width: 3840,     // 4K resolution
+  height: 2160,
+  bitrate: 25_000_000,  // 25 Mbps for 4K HDR
+
+  // HDR color space
+  colorSpace: {
+    primaries: 'bt2020',      // Wide color gamut
+    transfer: 'pq',           // PQ (ST.2084) transfer function
+    matrix: 'bt2020-ncl',     // BT.2020 non-constant luminance
+    fullRange: false          // Limited range (16-235)
+  }
+});
+
+// Encode 10-bit HDR frames
+// Note: Input should be linear RGB or PQ-encoded data
+```
+
+## Color Space Parameters
+
+### Color Primaries
+
+Defines the color gamut (range of colors):
+
+```javascript
+colorSpace: {
+  primaries: 'bt2020',  // HDR wide gamut
+  // primaries: 'bt709',  // SDR (Rec. 709)
+  // primaries: 'smpte432'  // DCI-P3 (Apple displays)
+}
+```
+
+<AccordionGroup>
+  <Accordion title="BT.2020 (Rec. 2020)">
+    **Wide Color Gamut for HDR**
+    - Covers ~75% of visible colors
+    - Standard for HDR10, HLG
+    - Much wider than BT.709 (SDR)
+    - Used in UHD/4K content
+  </Accordion>
+
+  <Accordion title="BT.709 (Rec. 709)">
+    **Standard Dynamic Range**
+    - Covers ~35% of visible colors
+    - Standard for HD TV, web video
+    - Most common color space
+  </Accordion>
+
+  <Accordion title="DCI-P3">
+    **Digital Cinema / Apple Displays**
+    - Covers ~45% of visible colors
+    - Used in cinema projection
+    - Native to Apple displays
+    - Between BT.709 and BT.2020
+  </Accordion>
+</AccordionGroup>
+
+### Transfer Function
+
+Defines how brightness values are encoded:
+
+```javascript
+colorSpace: {
+  transfer: 'pq',  // HDR10 (Perceptual Quantizer)
+  // transfer: 'hlg',  // HLG (Hybrid Log-Gamma)
+  // transfer: 'iec61966-2-1'  // sRGB (SDR)
+}
+```
+
+<AccordionGroup>
+  <Accordion title="PQ (ST.2084) - HDR10">
+    **Perceptual Quantizer**
+    - Absolute brightness encoding
+    - 0-10,000 nits range
+    - Best quality HDR
+    - Requires display calibration
+    - Most common HDR transfer function
+  </Accordion>
+
+  <Accordion title="HLG (Hybrid Log-Gamma)">
+    **Hybrid Log-Gamma**
+    - Relative brightness encoding
+    - Backward compatible with SDR
+    - No metadata needed
+    - Common in broadcast
+    - Simpler than PQ
+  </Accordion>
+
+  <Accordion title="sRGB / BT.709">
+    **Standard Dynamic Range**
+    - Gamma 2.2 / 2.4 encoding
+    - 0-100 nits range
+    - Used for SDR content
+  </Accordion>
+</AccordionGroup>
+
+### Matrix Coefficients
+
+Defines RGB ↔ YUV conversion:
+
+```javascript
+colorSpace: {
+  matrix: 'bt2020-ncl',  // BT.2020 non-constant luminance
+  // matrix: 'bt2020-cl',  // BT.2020 constant luminance (rare)
+  // matrix: 'bt709'       // Rec. 709 (SDR)
+}
+```
+
+### Color Range
+
+```javascript
+colorSpace: {
+  fullRange: false,  // Limited range (16-235) - standard for video
+  // fullRange: true  // Full range (0-255) - used for computer graphics
+}
+```
+
+## Complete HDR10 Example
+
+```javascript
+const { VideoEncoder, VideoFrame } = require('node-webcodecs');
+const fs = require('fs');
+
+async function encodeHDR10Video() {
+  const chunks = [];
+
+  const encoder = new VideoEncoder({
+    output: (chunk, metadata) => {
+      const buffer = Buffer.alloc(chunk.byteLength);
+      chunk.copyTo(buffer);
+      chunks.push(buffer);
+
+      if (metadata?.decoderConfig) {
+        console.log('HDR Encoder Config:', metadata.decoderConfig);
+      }
+    },
+    error: (err) => { throw err; }
+  });
+
+  // HDR10 configuration
+  encoder.configure({
+    codec: 'hevc_videotoolbox',  // or 'hevc_nvenc', 'hevc_qsv'
+    width: 3840,
+    height: 2160,
+    bitrate: 25_000_000,
+    framerate: 30,
+    hardwareAcceleration: 'prefer-hardware',
+
+    // HDR10 color space
+    colorSpace: {
+      primaries: 'bt2020',
+      transfer: 'pq',
+      matrix: 'bt2020-ncl',
+      fullRange: false
+    }
+  });
+
+  console.log('Encoding 4K HDR10 video...');
+
+  // Create HDR frames (10-bit data)
+  // Note: This example uses 8-bit for simplicity
+  // Real HDR should use 10-bit or 16-bit data
+  for (let i = 0; i < 60; i++) {  // 2 seconds at 30fps
+    const data = createHDRFrame(3840, 2160, i);
+
+    const frame = new VideoFrame(data, {
+      format: 'RGBA',
+      codedWidth: 3840,
+      codedHeight: 2160,
+      timestamp: i * 33333,
+
+      // Optionally specify per-frame color space
+      colorSpace: {
+        primaries: 'bt2020',
+        transfer: 'pq',
+        matrix: 'bt2020-ncl'
+      }
+    });
+
+    encoder.encode(frame, { keyFrame: i % 30 === 0 });
+    frame.close();
+  }
+
+  await encoder.flush();
+  encoder.close();
+
+  // Save to file
+  const output = Buffer.concat(chunks);
+  fs.writeFileSync('hdr10_output.hevc', output);
+
+  console.log(`Encoded ${chunks.length} chunks (${output.length} bytes)`);
+  console.log('Verify HDR metadata: ffprobe -show_streams hdr10_output.hevc');
+}
+
+function createHDRFrame(width, height, frameNum) {
+  const data = new Uint8Array(width * height * 4);
+
+  // Create a gradient pattern
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+
+      // Simulate HDR brightness (0-10,000 nits)
+      // Note: This is a simplified example
+      const brightness = Math.floor(((x / width) + (frameNum / 60)) * 255) % 256;
+
+      data[idx] = brightness;
+      data[idx + 1] = Math.floor(brightness * 0.8);
+      data[idx + 2] = Math.floor(brightness * 0.6);
+      data[idx + 3] = 255;
+    }
+  }
+
+  return data;
+}
+
+encodeHDR10Video().catch(console.error);
+```
+
+## HLG (Hybrid Log-Gamma) Encoding
+
+HLG is simpler than PQ and backward-compatible with SDR displays:
+
+```javascript
+encoder.configure({
+  codec: 'hevc_videotoolbox',
+  width: 1920,
+  height: 1080,
+  bitrate: 10_000_000,
+
+  // HLG color space
+  colorSpace: {
+    primaries: 'bt2020',
+    transfer: 'hlg',          // ← HLG instead of PQ
+    matrix: 'bt2020-ncl',
+    fullRange: false
+  }
+});
+```
+
+**HLG Benefits:**
+- No metadata required
+- Works on SDR displays (degrades gracefully)
+- Common in broadcast (BBC, NHK)
+- Simpler than HDR10
+
+**HLG Limitations:**
+- Relative (not absolute) brightness
+- Slightly lower quality than PQ
+- Less common in streaming
+
+## Verifying HDR Metadata
+
+After encoding, verify the HDR metadata with ffprobe:
+
+```bash
+ffprobe -show_streams hdr10_output.hevc
+```
+
+**Expected Output:**
+```
+color_range=tv
+color_space=bt2020nc
+color_transfer=smpte2084
+color_primaries=bt2020
+```
+
+- `color_primaries=bt2020` ✓ Wide color gamut
+- `color_transfer=smpte2084` ✓ PQ (ST.2084)
+- `color_space=bt2020nc` ✓ BT.2020 non-constant luminance
+- `color_range=tv` ✓ Limited range (16-235)
+
+## HDR Codec Support
+
+### Best Codecs for HDR
+
+<CodeGroup>
+```javascript HEVC (H.265) - Recommended
+// Best compression for HDR
+encoder.configure({
+  codec: 'hevc_videotoolbox',  // macOS
+  // codec: 'hevc_nvenc',      // NVIDIA
+  // codec: 'hevc_qsv',        // Intel
+  ...hdrConfig
+});
+```
+
+```javascript AV1 - Future Standard
+// Best compression, newer
+encoder.configure({
+  codec: 'av1_qsv',  // Intel Arc GPUs
+  // codec: 'libaom-av1',  // Software (slow)
+  ...hdrConfig
+});
+```
+
+```javascript VP9 - Good Alternative
+// Open source, good compression
+encoder.configure({
+  codec: 'vp09.02.10.10.01.09.16.09',  // VP9 Profile 2 (10-bit)
+  ...hdrConfig
+});
+```
+
+```javascript H.264 - Limited HDR Support
+// Not recommended for HDR
+// Limited to 8-bit (10-bit non-standard)
+encoder.configure({
+  codec: 'avc1.640028',
+  ...hdrConfig  // Metadata only, not true HDR
+});
+```
+</CodeGroup>
+
+## 10-Bit and 12-Bit Encoding
+
+HDR requires higher bit depth to avoid banding:
+
+```javascript
+// 10-bit HEVC (HDR10 standard)
+encoder.configure({
+  codec: 'hevc_videotoolbox',
+  width: 3840,
+  height: 2160,
+  // 10-bit is implied with PQ transfer function
+  colorSpace: {
+    primaries: 'bt2020',
+    transfer: 'pq',
+    matrix: 'bt2020-ncl'
+  }
+});
+
+// Note: Input frames should be 10-bit data
+// Use format: 'I010' or 'P010' for 10-bit YUV
+```
+
+<Note>
+**Bit Depth Importance**
+
+- **8-bit**: 256 levels per channel (SDR)
+- **10-bit**: 1,024 levels per channel (HDR10 standard)
+- **12-bit**: 4,096 levels per channel (Dolby Vision)
+
+Higher bit depth prevents banding in HDR's wider dynamic range.
+</Note>
+
+## Platform-Specific HDR Support
+
+### macOS (VideoToolbox)
+
+```javascript
+// macOS has excellent HDR support
+encoder.configure({
+  codec: 'hevc_videotoolbox',
+  width: 3840,
+  height: 2160,
+  colorSpace: {
+    primaries: 'bt2020',
+    transfer: 'pq',
+    matrix: 'bt2020-ncl'
+  },
+  hardwareAcceleration: 'prefer-hardware'
+});
+```
+
+VideoToolbox automatically handles 10-bit encoding for HDR.
+
+### Windows / Linux (NVIDIA NVENC)
+
+```javascript
+encoder.configure({
+  codec: 'hevc_nvenc',
+  width: 3840,
+  height: 2160,
+  colorSpace: {
+    primaries: 'bt2020',
+    transfer: 'pq',
+    matrix: 'bt2020-ncl'
+  },
+  hardwareAcceleration: 'prefer-hardware'
+});
+```
+
+NVENC supports 10-bit HEVC on newer GPUs (GTX 1000+).
+
+### Intel QuickSync
+
+```javascript
+encoder.configure({
+  codec: 'hevc_qsv',
+  width: 3840,
+  height: 2160,
+  colorSpace: {
+    primaries: 'bt2020',
+    transfer: 'pq',
+    matrix: 'bt2020-ncl'
+  }
+});
+```
+
+QuickSync supports 10-bit HEVC on 7th gen Core+ (Kaby Lake+).
+
+## Common Issues
+
+### Issue: HDR metadata not preserved
+
+**Solution**: Ensure color space is specified in both encoder config AND per-frame:
+
+```javascript
+// ✅ Specify in both places
+encoder.configure({
+  codec: 'hevc_videotoolbox',
+  colorSpace: { primaries: 'bt2020', transfer: 'pq', matrix: 'bt2020-ncl' }
+});
+
+const frame = new VideoFrame(data, {
+  colorSpace: { primaries: 'bt2020', transfer: 'pq', matrix: 'bt2020-ncl' },
+  ...
+});
+```
+
+### Issue: Banding in gradients
+
+**Cause**: 8-bit encoding for HDR content
+
+**Solution**: Use 10-bit codec and increase bitrate:
+
+```javascript
+encoder.configure({
+  codec: 'hevc_videotoolbox',  // Supports 10-bit
+  bitrate: 25_000_000,  // ← Increase bitrate for 4K HDR
+  colorSpace: { ... }
+});
+```
+
+### Issue: Colors look washed out
+
+**Cause**: Incorrect color space or transfer function
+
+**Solution**: Verify color space settings match your source:
+
+```javascript
+// For HDR10:
+colorSpace: {
+  primaries: 'bt2020',  // ✓ Wide gamut
+  transfer: 'pq',       // ✓ PQ transfer
+  matrix: 'bt2020-ncl', // ✓ BT.2020 matrix
+  fullRange: false      // ✓ Limited range
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use HEVC for HDR">
+    HEVC (H.265) provides the best compression and widest HDR support.
+
+    ```javascript
+    codec: 'hevc_videotoolbox'  // or hevc_nvenc, hevc_qsv
+    ```
+  </Accordion>
+
+  <Accordion title="Increase bitrate for HDR">
+    HDR needs 25-50% more bitrate than SDR for equivalent quality:
+
+    ```javascript
+    // SDR: 8 Mbps for 1080p
+    // HDR: 12 Mbps for 1080p
+
+    // SDR: 25 Mbps for 4K
+    // HDR: 40 Mbps for 4K
+    ```
+  </Accordion>
+
+  <Accordion title="Test on HDR displays">
+    Always verify HDR output on actual HDR displays:
+    - Apple XDR Display
+    - HDR TVs
+    - HDR monitors
+
+    SDR displays cannot show true HDR.
+  </Accordion>
+
+  <Accordion title="Provide SDR fallback">
+    Not all devices support HDR. Encode both versions:
+
+    ```javascript
+    // HDR version
+    const hdrEncoder = createHDREncoder();
+
+    // SDR version
+    const sdrEncoder = createSDREncoder();
+
+    // Encode both in parallel
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Hardware Acceleration" icon="microchip" href="/guides/hardware-acceleration">
+    GPU-accelerated HDR encoding
+  </Card>
+  <Card title="HDR Examples" icon="code" href="/examples/hdr-encoding">
+    Complete HDR encoding examples
+  </Card>
+  <Card title="Color Space API" icon="palette" href="/api-reference/VideoColorSpace">
+    VideoColorSpace reference
+  </Card>
+  <Card title="Real-World Demo" icon="video" href="/examples/real-world">
+    Production HDR workflows
+  </Card>
+</CardGroup>

@@ -1,0 +1,136 @@
+---
+title: "Alpha Video Example"
+description: "Complete example of transparent video encoding"
+---
+
+## Complete Alpha Video Example
+
+```javascript
+const { VideoEncoder, VideoFrame } = require('node-webcodecs');
+const fs = require('fs');
+
+async function encodeAlphaVideo() {
+  console.log('Encoding VP9 video with alpha channel...');
+
+  const chunks = [];
+
+  const encoder = new VideoEncoder({
+    output: (chunk) => {
+      const buffer = Buffer.alloc(chunk.byteLength);
+      chunk.copyTo(buffer);
+      chunks.push(buffer);
+    },
+    error: (err) => {
+      console.error('Error:', err);
+      throw err;
+    }
+  });
+
+  // VP9 with alpha
+  encoder.configure({
+    codec: 'vp09.00.10.08',
+    width: 1280,
+    height: 720,
+    bitrate: 4_000_000,
+    framerate: 30,
+    alpha: 'keep'  // ← Preserve transparency
+  });
+
+  console.log('Creating 60 frames with circular alpha...');
+
+  for (let i = 0; i < 60; i++) {
+    const data = createAlphaFrame(1280, 720, i);
+
+    const frame = new VideoFrame(data, {
+      format: 'RGBA',
+      codedWidth: 1280,
+      codedHeight: 720,
+      timestamp: i * 33333
+    });
+
+    encoder.encode(frame, { keyFrame: i % 30 === 0 });
+    frame.close();
+  }
+
+  await encoder.flush();
+  encoder.close();
+
+  const output = Buffer.concat(chunks);
+  fs.writeFileSync('alpha_video.vp9', output);
+
+  console.log(`✓ Encoded ${output.length} bytes with alpha channel`);
+  console.log('Verify: ffprobe -show_streams alpha_video.vp9');
+}
+
+function createAlphaFrame(width, height, frameNum) {
+  const data = new Uint8Array(width * height * 4);
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const radius = Math.min(centerX, centerY) * 0.8;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+      const dx = x - centerX;
+      const dy = y - centerY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      // Rainbow gradient
+      const hue = ((x / width) + (frameNum / 60)) % 1.0;
+      const rgb = hslToRgb(hue, 1, 0.5);
+
+      data[idx] = rgb[0];
+      data[idx + 1] = rgb[1];
+      data[idx + 2] = rgb[2];
+
+      // Circular alpha (fade from center)
+      if (dist < radius) {
+        data[idx + 3] = 255;
+      } else {
+        const fade = Math.max(0, 255 - (dist - radius) * 5);
+        data[idx + 3] = fade;
+      }
+    }
+  }
+
+  return data;
+}
+
+function hslToRgb(h, s, l) {
+  let r, g, b;
+
+  if (s === 0) {
+    r = g = b = l;
+  } else {
+    const hue2rgb = (p, q, t) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1/3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1/3);
+  }
+
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+
+encodeAlphaVideo().catch(console.error);
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Alpha Guide" icon="layer-group" href="/guides/alpha-channels">
+    Complete alpha documentation
+  </Card>
+  <Card title="Basic Examples" icon="code" href="/examples/basic-encoding">
+    More examples
+  </Card>
+</CardGroup>

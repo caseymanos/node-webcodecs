@@ -1,0 +1,449 @@
+---
+title: "Troubleshooting"
+description: "Common issues and solutions for node-webcodecs"
+---
+
+## Common Issues
+
+This guide covers the most frequently encountered issues when using node-webcodecs.
+
+## Memory Leaks
+
+### Symptom
+
+Application memory usage continuously increases, eventually crashing with:
+```
+FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory
+```
+
+### Cause
+
+VideoFrame objects not being closed after use.
+
+### Solution
+
+**Always call `.close()` on frames immediately after encoding/decoding:**
+
+<CodeGroup>
+```javascript ❌ Memory Leak
+const frame = new VideoFrame(data, options);
+encoder.encode(frame);
+// frame never closed - MEMORY LEAK!
+```
+
+```javascript ✅ Correct
+const frame = new VideoFrame(data, options);
+encoder.encode(frame);
+frame.close();  // ← CRITICAL
+```
+</CodeGroup>
+
+**Why this happens:**
+- VideoFrame wraps native C++ memory
+- JavaScript garbage collector doesn't see this memory
+- Must be manually freed with `.close()`
+
+<Warning>
+**Memory Leak Detection**
+
+Monitor memory usage during development:
+```bash
+node --expose-gc --trace_gc your-script.js
+```
+
+Or use:
+```javascript
+setInterval(() => {
+  const used = process.memoryUsage().heapUsed / 1024 / 1024;
+  console.log(`Memory: ${Math.round(used)} MB`);
+}, 1000);
+```
+</Warning>
+
+## Encoder/Decoder Errors
+
+### "Encoder is not configured"
+
+```javascript
+Error: Cannot encode frame: encoder is not configured
+```
+
+**Cause:** Encoding before calling `configure()`
+
+**Solution:**
+```javascript
+const encoder = new VideoEncoder({ ... });
+encoder.configure({ codec: 'avc1.42E01E', width: 1920, height: 1080 });  // ← Must configure first
+encoder.encode(frame);
+```
+
+### "Invalid codec string"
+
+```javascript
+Error: Unknown codec: 'h265'
+```
+
+**Cause:** Incorrect codec identifier
+
+**Solution:** Use proper codec strings:
+```javascript
+// ❌ Wrong
+codec: 'h265'
+codec: 'h264'
+
+// ✅ Correct
+codec: 'avc1.42E01E'   // H.264
+codec: 'hev1.1.6.L93.B0'  // HEVC
+codec: 'vp09.00.10.08'    // VP9
+```
+
+See [Codec Reference](/api-reference/VideoEncoder#codec-strings) for full list.
+
+### "Encoder closed"
+
+```javascript
+Error: Cannot encode frame: encoder is closed
+```
+
+**Cause:** Encoding after calling `encoder.close()`
+
+**Solution:**
+```javascript
+// Don't call encoder.close() until done encoding
+await encoder.flush();  // Wait for all frames
+encoder.close();        // Then close
+```
+
+## Frame Format Issues
+
+### "Unsupported format"
+
+```javascript
+Error: Unsupported pixel format: RGB
+```
+
+**Cause:** Using unsupported pixel format
+
+**Solution:** Use supported formats:
+```javascript
+// Supported formats
+format: 'RGBA'    // ✓ Most common
+format: 'I420'    // ✓ YUV 4:2:0
+format: 'NV12'    // ✓ YUV 4:2:0 (hardware)
+format: 'I010'    // ✓ 10-bit YUV
+
+// Not supported
+format: 'RGB'     // ✗
+format: 'BGR'     // ✗
+```
+
+### Wrong Buffer Size
+
+```javascript
+Error: Buffer size mismatch
+```
+
+**Cause:** Buffer doesn't match frame dimensions
+
+**Solution:**
+```javascript
+const width = 1920;
+const height = 1080;
+
+// RGBA: width × height × 4 bytes
+const rgbaSize = width * height * 4;
+const rgbaBuffer = new Uint8Array(rgbaSize);
+
+// I420: width × height × 1.5 bytes
+const i420Size = Math.floor(width * height * 1.5);
+const i420Buffer = new Uint8Array(i420Size);
+```
+
+## Timestamp Issues
+
+### Video Plays Too Fast/Slow
+
+**Cause:** Wrong timestamp units
+
+**Solution:** Use **microseconds**, not milliseconds:
+
+```javascript
+// ❌ Wrong (milliseconds)
+timestamp: i * 33  // Will play 1000x too fast!
+
+// ✅ Correct (microseconds)
+timestamp: i * 33333  // 30 fps
+timestamp: i * 16667  // 60 fps
+timestamp: i * 1_000_000 / fps  // General formula
+```
+
+### Frames Out of Order
+
+**Cause:** Incorrect timestamp ordering
+
+**Solution:** Ensure monotonically increasing timestamps:
+
+```javascript
+for (let i = 0; i < frames.length; i++) {
+  const timestamp = i * frameDuration;  // ✓ Always increasing
+  frame.timestamp = timestamp;
+}
+```
+
+## Hardware Acceleration Issues
+
+### "Hardware encoder not found"
+
+```javascript
+Error: Unknown encoder 'h264_videotoolbox'
+```
+
+**Cause:** FFmpeg not compiled with hardware support
+
+**Solution:** Check available encoders:
+```bash
+ffmpeg -encoders | grep videotoolbox  # macOS
+ffmpeg -encoders | grep nvenc          # NVIDIA
+ffmpeg -encoders | grep qsv            # Intel
+```
+
+If missing, reinstall FFmpeg with hardware support:
+```bash
+# macOS
+brew reinstall ffmpeg
+
+# Linux (compile from source)
+./configure --enable-nvenc --enable-videotoolbox
+```
+
+### Hardware Encoder Fails
+
+**Solution:** Fallback to software encoder:
+
+```javascript
+let codec = 'h264_videotoolbox';
+
+const support = await VideoEncoder.isConfigSupported({
+  codec,
+  width: 1920,
+  height: 1080
+});
+
+if (!support.supported) {
+  console.warn('Hardware encoder unavailable, using software');
+  codec = 'avc1.42E01E';  // Software fallback
+}
+
+encoder.configure({ codec, width: 1920, height: 1080 });
+```
+
+## Performance Issues
+
+### Slow Encoding
+
+**Symptoms:**
+- Encoding takes too long
+- High CPU usage
+- Dropped frames
+
+**Solutions:**
+
+<AccordionGroup>
+  <Accordion title="Use hardware acceleration">
+    ```javascript
+    encoder.configure({
+      codec: 'h264_videotoolbox',  // 8-15x faster
+      hardwareAcceleration: 'prefer-hardware'
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Reduce resolution">
+    ```javascript
+    // Instead of 4K:
+    width: 3840, height: 2160
+
+    // Try 1080p:
+    width: 1920, height: 1080  // 4x faster
+    ```
+  </Accordion>
+
+  <Accordion title="Lower framerate">
+    ```javascript
+    framerate: 30  // Instead of 60
+    ```
+  </Accordion>
+
+  <Accordion title="Use worker threads">
+    See [Worker Threads Guide](/guides/worker-threads) for parallel encoding.
+  </Accordion>
+</AccordionGroup>
+
+### High Memory Usage
+
+**Solutions:**
+
+1. **Close frames immediately**
+   ```javascript
+   encoder.encode(frame);
+   frame.close();  // Don't wait
+   ```
+
+2. **Limit queue size**
+   ```javascript
+   if (encoder.encodeQueueSize > 10) {
+     await encoder.flush();  // Wait before adding more
+   }
+   ```
+
+3. **Process in batches**
+   ```javascript
+   // Instead of loading all frames:
+   for (const frame of allFrames) { ... }
+
+   // Process in chunks:
+   for (let i = 0; i < total; i += 100) {
+     const batch = frames.slice(i, i + 100);
+     await processBatch(batch);
+   }
+   ```
+
+## Platform-Specific Issues
+
+### macOS
+
+**Issue:** "Operation not permitted" errors
+
+**Solution:** Grant permissions for video acceleration:
+```bash
+# Reset permissions
+tccutil reset All
+
+# Or grant manually:
+# System Preferences > Security & Privacy > Camera/Screen Recording
+```
+
+### Linux
+
+**Issue:** NVIDIA encoder not working
+
+**Solution:**
+1. Install NVIDIA drivers
+2. Compile FFmpeg with NVENC support:
+   ```bash
+   sudo apt install nvidia-cuda-toolkit
+   ./configure --enable-nvenc --enable-cuda-nvcc
+   ```
+
+### Windows
+
+**Issue:** DirectX errors
+
+**Solution:** Update graphics drivers:
+- NVIDIA: GeForce Experience
+- AMD: AMD Software
+- Intel: Intel Driver & Support Assistant
+
+## Debugging Tips
+
+### Enable Detailed Logging
+
+```javascript
+// Add error handlers
+const encoder = new VideoEncoder({
+  output: (chunk, metadata) => {
+    console.log(`Encoded: ${chunk.byteLength} bytes, type: ${chunk.type}`);
+  },
+  error: (err) => {
+    console.error('Encoder error:', err.message);
+    console.error('Stack:', err.stack);
+  }
+});
+
+// Log state changes
+console.log('Encoder state:', encoder.state);
+console.log('Queue size:', encoder.encodeQueueSize);
+```
+
+### Test With Simple Example
+
+If having issues, test with the most basic example:
+
+```javascript
+const { VideoEncoder, VideoFrame } = require('node-webcodecs');
+
+const encoder = new VideoEncoder({
+  output: (chunk) => console.log(`Chunk: ${chunk.byteLength} bytes`),
+  error: (err) => console.error('Error:', err)
+});
+
+encoder.configure({
+  codec: 'avc1.42E01E',
+  width: 640,
+  height: 480,
+  bitrate: 1_000_000
+});
+
+const data = new Uint8Array(640 * 480 * 4).fill(255);
+const frame = new VideoFrame(data, {
+  format: 'RGBA',
+  codedWidth: 640,
+  codedHeight: 480,
+  timestamp: 0
+});
+
+encoder.encode(frame);
+frame.close();
+
+await encoder.flush();
+encoder.close();
+
+console.log('✓ Basic test passed');
+```
+
+### Check FFmpeg Installation
+
+```bash
+# Verify FFmpeg is installed
+ffmpeg -version
+
+# Check available codecs
+ffmpeg -codecs | grep h264
+ffmpeg -codecs | grep hevc
+ffmpeg -codecs | grep vp9
+
+# Check hardware encoders
+ffmpeg -encoders | grep videotoolbox
+ffmpeg -encoders | grep nvenc
+ffmpeg -encoders | grep qsv
+```
+
+## Getting Help
+
+If you're still stuck:
+
+1. **Check GitHub Issues:** https://github.com/caseymanos/node-webcodecs/issues
+2. **Create a minimal reproduction**
+3. **Include:**
+   - node-webcodecs version (`npm list node-webcodecs`)
+   - Node.js version (`node --version`)
+   - Operating system
+   - Error message and stack trace
+   - Minimal code to reproduce
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="book" href="/api-reference/VideoEncoder">
+    Complete API documentation
+  </Card>
+  <Card title="Examples" icon="code" href="/examples/basic-encoding">
+    Working code examples
+  </Card>
+  <Card title="GitHub Issues" icon="github" href="https://github.com/caseymanos/node-webcodecs/issues">
+    Report bugs and get help
+  </Card>
+  <Card title="Quick Start" icon="rocket" href="/getting-started/quick-start">
+    Back to basics
+  </Card>
+</CardGroup>

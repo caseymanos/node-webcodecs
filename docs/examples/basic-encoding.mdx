@@ -1,0 +1,469 @@
+---
+title: "Basic Encoding Examples"
+description: "Simple encoding examples to get you started"
+---
+
+## Red Screen Video
+
+The simplest possible example - encode 1 second of red frames:
+
+```javascript
+const { VideoEncoder, VideoFrame } = require('node-webcodecs');
+const fs = require('fs');
+
+async function encodeRedScreen() {
+  const chunks = [];
+
+  const encoder = new VideoEncoder({
+    output: (chunk) => {
+      const buffer = Buffer.alloc(chunk.byteLength);
+      chunk.copyTo(buffer);
+      chunks.push(buffer);
+      console.log(`Encoded chunk ${chunks.length}: ${chunk.byteLength} bytes`);
+    },
+    error: (err) => {
+      console.error('Encoder error:', err);
+      throw err;
+    }
+  });
+
+  // Configure for H.264
+  encoder.configure({
+    codec: 'avc1.42E01E',
+    width: 640,
+    height: 480,
+    bitrate: 1_000_000
+  });
+
+  console.log('Encoding 30 frames (1 second at 30fps)...');
+
+  // Create red frame data (RGBA)
+  const redFrame = new Uint8Array(640 * 480 * 4);
+  for (let i = 0; i < redFrame.length; i += 4) {
+    redFrame[i] = 255;     // Red
+    redFrame[i + 1] = 0;   // Green
+    redFrame[i + 2] = 0;   // Blue
+    redFrame[i + 3] = 255; // Alpha
+  }
+
+  // Encode 30 frames
+  for (let i = 0; i < 30; i++) {
+    const frame = new VideoFrame(redFrame, {
+      format: 'RGBA',
+      codedWidth: 640,
+      codedHeight: 480,
+      timestamp: i * 33333  // 30fps = 33.333ms per frame
+    });
+
+    encoder.encode(frame, { keyFrame: i === 0 });
+    frame.close();
+  }
+
+  await encoder.flush();
+  encoder.close();
+
+  // Save to file
+  const output = Buffer.concat(chunks);
+  fs.writeFileSync('red_screen.h264', output);
+
+  console.log(`✓ Saved ${output.length} bytes to red_screen.h264`);
+  console.log('Play with: ffplay red_screen.h264');
+}
+
+encodeRedScreen().catch(console.error);
+```
+
+## Rainbow Gradient
+
+Encode a colorful gradient animation:
+
+```javascript
+const { VideoEncoder, VideoFrame } = require('node-webcodecs');
+const fs = require('fs');
+
+async function encodeRainbowGradient() {
+  const chunks = [];
+
+  const encoder = new VideoEncoder({
+    output: (chunk) => {
+      const buffer = Buffer.alloc(chunk.byteLength);
+      chunk.copyTo(buffer);
+      chunks.push(buffer);
+    },
+    error: (err) => { throw err; }
+  });
+
+  encoder.configure({
+    codec: 'avc1.42E01E',
+    width: 1280,
+    height: 720,
+    bitrate: 5_000_000,
+    framerate: 30
+  });
+
+  console.log('Encoding rainbow gradient...');
+
+  // Encode 60 frames (2 seconds)
+  for (let frameNum = 0; frameNum < 60; frameNum++) {
+    const data = new Uint8Array(1280 * 720 * 4);
+
+    for (let y = 0; y < 720; y++) {
+      for (let x = 0; x < 1280; x++) {
+        const idx = (y * 1280 + x) * 4;
+
+        // Rainbow gradient that animates
+        const hue = ((x / 1280) + (frameNum / 60)) % 1.0;
+        const rgb = hslToRgb(hue, 1.0, 0.5);
+
+        data[idx] = rgb[0];
+        data[idx + 1] = rgb[1];
+        data[idx + 2] = rgb[2];
+        data[idx + 3] = 255;
+      }
+    }
+
+    const frame = new VideoFrame(data, {
+      format: 'RGBA',
+      codedWidth: 1280,
+      codedHeight: 720,
+      timestamp: frameNum * 33333
+    });
+
+    encoder.encode(frame, { keyFrame: frameNum % 30 === 0 });
+    frame.close();
+
+    if ((frameNum + 1) % 10 === 0) {
+      console.log(`  Encoded ${frameNum + 1}/60 frames`);
+    }
+  }
+
+  await encoder.flush();
+  encoder.close();
+
+  const output = Buffer.concat(chunks);
+  fs.writeFileSync('rainbow.h264', output);
+
+  console.log(`✓ Saved ${output.length} bytes to rainbow.h264`);
+}
+
+// Helper: HSL to RGB conversion
+function hslToRgb(h, s, l) {
+  let r, g, b;
+
+  if (s === 0) {
+    r = g = b = l;
+  } else {
+    const hue2rgb = (p, q, t) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+
+    r = hue2rgb(p, q, h + 1/3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1/3);
+  }
+
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+
+encodeRainbowGradient().catch(console.error);
+```
+
+## Text Frame
+
+Encode a frame with text (using Canvas):
+
+```javascript
+const { VideoEncoder, VideoFrame } = require('node-webcodecs');
+const { createCanvas } = require('canvas');
+const fs = require('fs');
+
+async function encodeTextFrame() {
+  const chunks = [];
+
+  const encoder = new VideoEncoder({
+    output: (chunk) => {
+      const buffer = Buffer.alloc(chunk.byteLength);
+      chunk.copyTo(buffer);
+      chunks.push(buffer);
+    },
+    error: (err) => { throw err; }
+  });
+
+  encoder.configure({
+    codec: 'avc1.42E01E',
+    width: 1920,
+    height: 1080,
+    bitrate: 5_000_000
+  });
+
+  // Create canvas
+  const canvas = createCanvas(1920, 1080);
+  const ctx = canvas.getContext('2d');
+
+  // Encode 90 frames (3 seconds)
+  for (let i = 0; i < 90; i++) {
+    // Clear canvas
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, 1920, 1080);
+
+    // Draw text
+    ctx.fillStyle = '#00ffc8';
+    ctx.font = 'bold 120px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const text = `Frame ${i + 1}`;
+    ctx.fillText(text, 960, 540);
+
+    // Get pixel data
+    const imageData = ctx.getImageData(0, 0, 1920, 1080);
+    const pixels = new Uint8Array(imageData.data);
+
+    // Create frame
+    const frame = new VideoFrame(pixels, {
+      format: 'RGBA',
+      codedWidth: 1920,
+      codedHeight: 1080,
+      timestamp: i * 33333
+    });
+
+    encoder.encode(frame, { keyFrame: i % 30 === 0 });
+    frame.close();
+  }
+
+  await encoder.flush();
+  encoder.close();
+
+  const output = Buffer.concat(chunks);
+  fs.writeFileSync('text_frames.h264', output);
+
+  console.log(`✓ Encoded 90 frames with text`);
+}
+
+encodeTextFrame().catch(console.error);
+```
+
+## Multiple Colors
+
+Encode frames with different colors:
+
+```javascript
+const { VideoEncoder, VideoFrame } = require('node-webcodecs');
+const fs = require('fs');
+
+async function encodeColorSequence() {
+  const chunks = [];
+
+  const encoder = new VideoEncoder({
+    output: (chunk) => {
+      const buffer = Buffer.alloc(chunk.byteLength);
+      chunk.copyTo(buffer);
+      chunks.push(buffer);
+    },
+    error: (err) => { throw err; }
+  });
+
+  encoder.configure({
+    codec: 'avc1.42E01E',
+    width: 1280,
+    height: 720,
+    bitrate: 3_000_000
+  });
+
+  // Color sequence
+  const colors = [
+    { name: 'Red',     r: 255, g: 0,   b: 0   },
+    { name: 'Orange',  r: 255, g: 165, b: 0   },
+    { name: 'Yellow',  r: 255, g: 255, b: 0   },
+    { name: 'Green',   r: 0,   g: 255, b: 0   },
+    { name: 'Blue',    r: 0,   g: 0,   b: 255 },
+    { name: 'Indigo',  r: 75,  g: 0,   b: 130 },
+    { name: 'Violet',  r: 148, g: 0,   b: 211 }
+  ];
+
+  console.log('Encoding color sequence...');
+
+  let frameNum = 0;
+
+  // 30 frames per color (1 second each)
+  for (const color of colors) {
+    console.log(`  Encoding ${color.name}...`);
+
+    const data = new Uint8Array(1280 * 720 * 4);
+
+    // Fill with solid color
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = color.r;
+      data[i + 1] = color.g;
+      data[i + 2] = color.b;
+      data[i + 3] = 255;
+    }
+
+    // Encode 30 frames of this color
+    for (let i = 0; i < 30; i++) {
+      const frame = new VideoFrame(data, {
+        format: 'RGBA',
+        codedWidth: 1280,
+        codedHeight: 720,
+        timestamp: frameNum * 33333
+      });
+
+      encoder.encode(frame, { keyFrame: frameNum % 30 === 0 });
+      frame.close();
+      frameNum++;
+    }
+  }
+
+  await encoder.flush();
+  encoder.close();
+
+  const output = Buffer.concat(chunks);
+  fs.writeFileSync('colors.h264', output);
+
+  console.log(`✓ Encoded ${frameNum} frames (${colors.length} colors)`);
+}
+
+encodeColorSequence().catch(console.error);
+```
+
+## Checkerboard Pattern
+
+Encode an animated checkerboard:
+
+```javascript
+async function encodeCheckerboard() {
+  const chunks = [];
+
+  const encoder = new VideoEncoder({
+    output: (chunk) => {
+      const buffer = Buffer.alloc(chunk.byteLength);
+      chunk.copyTo(buffer);
+      chunks.push(buffer);
+    },
+    error: (err) => { throw err; }
+  });
+
+  encoder.configure({
+    codec: 'avc1.42E01E',
+    width: 1920,
+    height: 1080,
+    bitrate: 5_000_000
+  });
+
+  console.log('Encoding checkerboard pattern...');
+
+  // Encode 60 frames
+  for (let frameNum = 0; frameNum < 60; frameNum++) {
+    const data = new Uint8Array(1920 * 1080 * 4);
+    const squareSize = 40;
+
+    for (let y = 0; y < 1080; y++) {
+      for (let x = 0; x < 1920; x++) {
+        const idx = (y * 1920 + x) * 4;
+
+        // Checkerboard pattern that shifts
+        const offsetX = frameNum * 5;
+        const col = Math.floor((x + offsetX) / squareSize);
+        const row = Math.floor(y / squareSize);
+        const isBlack = (col + row) % 2 === 0;
+
+        const value = isBlack ? 0 : 255;
+        data[idx] = value;
+        data[idx + 1] = value;
+        data[idx + 2] = value;
+        data[idx + 3] = 255;
+      }
+    }
+
+    const frame = new VideoFrame(data, {
+      format: 'RGBA',
+      codedWidth: 1920,
+      codedHeight: 1080,
+      timestamp: frameNum * 33333
+    });
+
+    encoder.encode(frame, { keyFrame: frameNum % 30 === 0 });
+    frame.close();
+  }
+
+  await encoder.flush();
+  encoder.close();
+
+  const output = Buffer.concat(chunks);
+  fs.writeFileSync('checkerboard.h264', output);
+
+  console.log('✓ Encoded checkerboard animation');
+}
+
+encodeCheckerboard().catch(console.error);
+```
+
+## Tips for Beginners
+
+<AccordionGroup>
+  <Accordion title="Always close frames">
+    ```javascript
+    const frame = new VideoFrame(data, options);
+    encoder.encode(frame);
+    frame.close();  // ← CRITICAL!
+    ```
+
+    Forgetting to close frames causes memory leaks.
+  </Accordion>
+
+  <Accordion title="Use correct timestamp units">
+    ```javascript
+    // ❌ Wrong (milliseconds)
+    timestamp: i * 33
+
+    // ✅ Correct (microseconds)
+    timestamp: i * 33333  // 30 fps
+    ```
+
+    WebCodecs uses microseconds, not milliseconds.
+  </Accordion>
+
+  <Accordion title="Await flush before closing">
+    ```javascript
+    await encoder.flush();  // ← Wait for all frames
+    encoder.close();        // ← Then close
+    ```
+
+    Closing before flush loses frames.
+  </Accordion>
+
+  <Accordion title="Set keyframes appropriately">
+    ```javascript
+    encoder.encode(frame, {
+      keyFrame: i % 30 === 0  // Keyframe every second
+    });
+    ```
+
+    First frame should always be a keyframe.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="First Decode" icon="play" href="/getting-started/first-decode">
+    Learn to decode video
+  </Card>
+  <Card title="HDR Examples" icon="sun" href="/examples/hdr-encoding">
+    High dynamic range video
+  </Card>
+  <Card title="Alpha Examples" icon="layer-group" href="/examples/alpha-video">
+    Transparent video
+  </Card>
+  <Card title="Real-World" icon="video" href="/examples/real-world">
+    Production examples
+  </Card>
+</CardGroup>

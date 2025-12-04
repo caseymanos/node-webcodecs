@@ -1,0 +1,617 @@
+---
+title: "Alpha Channel Encoding"
+description: "Encode video with transparency using VP8/VP9 alpha channels"
+---
+
+## Overview
+
+Alpha channels add transparency support to video, enabling:
+
+- **Transparent video overlays** (logos, graphics, UI elements)
+- **Green screen alternatives** (pre-keyed footage)
+- **Animated stickers and GIFs** with transparency
+- **Compositing workflows** without chroma keying
+
+node-webcodecs supports alpha channel encoding with VP8 and VP9 codecs.
+
+## Codec Support
+
+<CardGroup cols={2}>
+  <Card title="VP9" icon="check" color="#green">
+    **Recommended for Alpha**
+    - Better compression than VP8
+    - YUVA420P format
+    - Widely supported
+    - WebM container
+  </Card>
+  <Card title="VP8" icon="check" color="#green">
+    **Legacy Alpha Support**
+    - Good compression
+    - YUVA420P format
+    - Older browsers
+    - WebM container
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="H.264" icon="xmark" color="#red">
+    **No Alpha Support**
+    - YUV only
+    - No transparency
+  </Card>
+  <Card title="HEVC" icon="xmark" color="#red">
+    **Limited Alpha Support**
+    - Not widely supported
+    - Proprietary extensions
+  </Card>
+</CardGroup>
+
+<Note>
+**Browser Playback**
+
+Alpha video can be played in browsers using:
+- `<video>` tag with WebM container
+- Canvas API for compositing
+- WebGL for advanced effects
+</Note>
+
+## Quick Start
+
+```javascript
+const { VideoEncoder, VideoFrame } = require('node-webcodecs');
+
+const encoder = new VideoEncoder({
+  output: (chunk, metadata) => {
+    // Handle encoded alpha video chunk
+  },
+  error: (err) => console.error(err)
+});
+
+// Configure for alpha channel
+encoder.configure({
+  codec: 'vp09.00.10.08',  // VP9
+  width: 1920,
+  height: 1080,
+  bitrate: 5_000_000,
+  alpha: 'keep'  // ← Preserve alpha channel
+});
+
+// Encode RGBA frames
+const data = new Uint8Array(1920 * 1080 * 4);
+// ... fill with RGBA data (A = transparency) ...
+
+const frame = new VideoFrame(data, {
+  format: 'RGBA',
+  codedWidth: 1920,
+  codedHeight: 1080,
+  timestamp: 0
+});
+
+encoder.encode(frame);
+frame.close();
+```
+
+## Alpha Modes
+
+### Keep Alpha (`alpha: 'keep'`)
+
+Preserves transparency in the encoded video:
+
+```javascript
+encoder.configure({
+  codec: 'vp09.00.10.08',
+  width: 1920,
+  height: 1080,
+  alpha: 'keep'  // ← Preserve alpha
+});
+```
+
+**Use cases:**
+- Transparent overlays
+- UI elements
+- Animated stickers
+- Any content with transparency
+
+### Discard Alpha (`alpha: 'discard'`)
+
+Removes alpha channel, treats it as fully opaque:
+
+```javascript
+encoder.configure({
+  codec: 'vp09.00.10.08',
+  width: 1920,
+  height: 1080,
+  alpha: 'discard'  // ← Remove alpha (default)
+});
+```
+
+**Use cases:**
+- Converting RGBA to RGB
+- When transparency isn't needed
+- Smaller file sizes
+
+<Note>
+**Default Behavior**
+
+If `alpha` is not specified, it defaults to `'discard'`. Always set `alpha: 'keep'` explicitly for transparent video.
+</Note>
+
+## Complete Example
+
+```javascript
+const { VideoEncoder, VideoFrame } = require('node-webcodecs');
+const fs = require('fs');
+
+async function encodeAlphaVideo() {
+  const chunks = [];
+
+  const encoder = new VideoEncoder({
+    output: (chunk, metadata) => {
+      const buffer = Buffer.alloc(chunk.byteLength);
+      chunk.copyTo(buffer);
+      chunks.push(buffer);
+
+      if (metadata?.decoderConfig) {
+        console.log('Encoder config:', metadata.decoderConfig);
+      }
+    },
+    error: (err) => { throw err; }
+  });
+
+  // VP9 with alpha channel
+  encoder.configure({
+    codec: 'vp09.00.10.08',
+    width: 640,
+    height: 480,
+    bitrate: 2_000_000,
+    framerate: 30,
+    alpha: 'keep'  // Preserve transparency
+  });
+
+  console.log('Encoding 60 frames with alpha channel...');
+
+  // Create frames with circular transparency
+  for (let i = 0; i < 60; i++) {
+    const data = createAlphaFrame(640, 480, i);
+
+    const frame = new VideoFrame(data, {
+      format: 'RGBA',
+      codedWidth: 640,
+      codedHeight: 480,
+      timestamp: i * 33333
+    });
+
+    encoder.encode(frame, { keyFrame: i % 30 === 0 });
+    frame.close();
+  }
+
+  await encoder.flush();
+  encoder.close();
+
+  // Save to file
+  const output = Buffer.concat(chunks);
+  fs.writeFileSync('alpha_video.vp9', output);
+
+  console.log(`Encoded ${chunks.length} chunks with alpha`);
+  console.log(`File size: ${output.length} bytes`);
+}
+
+function createAlphaFrame(width, height, frameNum) {
+  const data = new Uint8Array(width * height * 4);
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const maxDist = Math.sqrt(centerX * centerX + centerY * centerY);
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+
+      // Calculate distance from center
+      const dx = x - centerX;
+      const dy = y - centerY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      // Color gradient
+      const hue = (frameNum / 60) * 360;
+      data[idx] = Math.floor((x / width) * 255);       // R
+      data[idx + 1] = Math.floor((y / height) * 255);  // G
+      data[idx + 2] = Math.floor(hue % 256);           // B
+
+      // Alpha: fade from opaque (center) to transparent (edges)
+      data[idx + 3] = Math.max(0, 255 - Math.floor((dist / maxDist) * 255));
+    }
+  }
+
+  return data;
+}
+
+encodeAlphaVideo().catch(console.error);
+```
+
+**Output:**
+```
+Encoding 60 frames with alpha channel...
+Encoder config: { codec: 'vp09.00.10.08', ... }
+Encoded 60 chunks with alpha
+File size: 125890 bytes
+```
+
+## Creating Alpha Frames
+
+### From RGBA Data
+
+```javascript
+// Create RGBA buffer
+const width = 1920;
+const height = 1080;
+const data = new Uint8Array(width * height * 4);
+
+for (let i = 0; i < data.length; i += 4) {
+  data[i] = 255;     // Red
+  data[i + 1] = 0;   // Green
+  data[i + 2] = 0;   // Blue
+  data[i + 3] = 128; // Alpha (50% transparent)
+}
+
+const frame = new VideoFrame(data, {
+  format: 'RGBA',
+  codedWidth: width,
+  codedHeight: height,
+  timestamp: 0
+});
+```
+
+### Circular Gradient Alpha
+
+```javascript
+function createCircularAlpha(width, height) {
+  const data = new Uint8Array(width * height * 4);
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const radius = Math.min(centerX, centerY);
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+      const dx = x - centerX;
+      const dy = y - centerY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      // Solid color
+      data[idx] = 255;      // R
+      data[idx + 1] = 255;  // G
+      data[idx + 2] = 255;  // B
+
+      // Circular alpha (opaque in center, transparent outside)
+      if (dist < radius) {
+        data[idx + 3] = 255;
+      } else {
+        data[idx + 3] = Math.max(0, 255 - (dist - radius));
+      }
+    }
+  }
+
+  return data;
+}
+```
+
+### Feathered Edge Alpha
+
+```javascript
+function createFeatheredAlpha(width, height, featherSize = 50) {
+  const data = new Uint8Array(width * height * 4);
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+
+      // Color
+      data[idx] = 255;
+      data[idx + 1] = 0;
+      data[idx + 2] = 0;
+
+      // Feathered edges
+      const distFromEdge = Math.min(x, y, width - x - 1, height - y - 1);
+      const alpha = Math.min(255, (distFromEdge / featherSize) * 255);
+
+      data[idx + 3] = alpha;
+    }
+  }
+
+  return data;
+}
+```
+
+## VP8 vs VP9 for Alpha
+
+<Tabs>
+  <Tab title="VP9 (Recommended)">
+    ```javascript
+    encoder.configure({
+      codec: 'vp09.00.10.08',  // VP9 Profile 0
+      width: 1920,
+      height: 1080,
+      bitrate: 5_000_000,
+      alpha: 'keep'
+    });
+    ```
+
+    **Advantages:**
+    - 20-50% better compression than VP8
+    - Lower file sizes
+    - Modern browsers
+    - Better quality
+
+    **Disadvantages:**
+    - Slightly slower encoding
+    - Older browser support limited
+  </Tab>
+
+  <Tab title="VP8">
+    ```javascript
+    encoder.configure({
+      codec: 'vp8',
+      width: 1920,
+      height: 1080,
+      bitrate: 6_000_000,  // Higher bitrate for same quality
+      alpha: 'keep'
+    });
+    ```
+
+    **Advantages:**
+    - Faster encoding
+    - Better legacy browser support
+    - Simpler codec
+
+    **Disadvantages:**
+    - Larger file sizes
+    - Lower compression efficiency
+  </Tab>
+</Tabs>
+
+## Bitrate Recommendations
+
+Alpha channels increase bitrate requirements:
+
+```javascript
+// Without alpha (VP9)
+bitrate: 5_000_000  // 5 Mbps for 1080p
+
+// With alpha (VP9)
+bitrate: 7_000_000  // 7 Mbps for 1080p (40% increase)
+```
+
+**Recommended Bitrates with Alpha:**
+
+| Resolution | VP9 with Alpha | VP8 with Alpha |
+|------------|----------------|----------------|
+| 480p | 1.5 Mbps | 2 Mbps |
+| 720p | 3 Mbps | 4 Mbps |
+| 1080p | 7 Mbps | 9 Mbps |
+| 1440p | 12 Mbps | 16 Mbps |
+| 4K | 25 Mbps | 35 Mbps |
+
+## Verifying Alpha in Output
+
+Check if alpha channel is preserved:
+
+```bash
+ffprobe -show_streams alpha_video.vp9
+```
+
+**Look for:**
+```
+pix_fmt=yuva420p  # ✓ Alpha preserved (YUVA)
+pix_fmt=yuv420p   # ✗ Alpha discarded (YUV)
+```
+
+## Browser Playback
+
+### HTML5 Video
+
+```html
+<!-- Alpha video in HTML -->
+<video controls>
+  <source src="alpha_video.webm" type="video/webm; codecs=vp9">
+</video>
+
+<style>
+  video {
+    background: linear-gradient(45deg, #ccc 25%, transparent 25%,
+                transparent 75%, #ccc 75%, #ccc),
+                linear-gradient(45deg, #ccc 25%, transparent 25%,
+                transparent 75%, #ccc 75%, #ccc);
+    background-size: 20px 20px;
+    background-position: 0 0, 10px 10px;
+  }
+</style>
+```
+
+### Canvas Compositing
+
+```javascript
+const video = document.querySelector('video');
+const canvas = document.querySelector('canvas');
+const ctx = canvas.getContext('2d');
+
+function drawFrame() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw background
+  ctx.fillStyle = 'blue';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Draw alpha video on top
+  ctx.drawImage(video, 0, 0);
+
+  requestAnimationFrame(drawFrame);
+}
+
+video.addEventListener('play', drawFrame);
+```
+
+## Common Use Cases
+
+### Logo Overlay
+
+```javascript
+// Encode transparent logo animation
+encoder.configure({
+  codec: 'vp09.00.10.08',
+  width: 200,   // Small logo
+  height: 100,
+  bitrate: 500_000,
+  alpha: 'keep'
+});
+
+// Position logo in corner during playback
+```
+
+### Animated Stickers
+
+```javascript
+// Create animated sticker with transparency
+encoder.configure({
+  codec: 'vp09.00.10.08',
+  width: 512,
+  height: 512,
+  framerate: 30,
+  bitrate: 1_500_000,
+  alpha: 'keep'
+});
+
+// Perfect for social media, messaging apps
+```
+
+### UI Elements
+
+```javascript
+// Encode transparent UI animations
+encoder.configure({
+  codec: 'vp09.00.10.08',
+  width: 1920,
+  height: 200,  // Thin banner
+  bitrate: 1_000_000,
+  alpha: 'keep'
+});
+
+// Overlay on live video or game footage
+```
+
+## Performance Considerations
+
+Alpha encoding is more demanding than RGB encoding:
+
+```javascript
+// Encoding time comparison (1080p, 60 frames)
+// VP9 RGB:   ~500ms
+// VP9 RGBA:  ~750ms (50% slower)
+
+// File size comparison
+// VP9 RGB:   ~2 MB
+// VP9 RGBA:  ~2.8 MB (40% larger)
+```
+
+**Optimization tips:**
+- Use lower resolution for alpha elements
+- Increase compression with lower bitrate
+- Consider pre-rendering static transparency
+
+## Common Issues
+
+### Issue: Alpha not preserved
+
+```javascript
+// ❌ Alpha discarded (default behavior)
+encoder.configure({
+  codec: 'vp09.00.10.08',
+  // Missing alpha: 'keep'
+});
+
+// ✅ Alpha preserved
+encoder.configure({
+  codec: 'vp09.00.10.08',
+  alpha: 'keep'
+});
+```
+
+### Issue: Poor alpha quality (blocky edges)
+
+**Solution**: Increase bitrate for alpha channel:
+
+```javascript
+encoder.configure({
+  codec: 'vp09.00.10.08',
+  bitrate: 7_000_000,  // ← Higher bitrate for clean alpha
+  alpha: 'keep'
+});
+```
+
+### Issue: Large file sizes
+
+**Solution**: Use VP9 instead of VP8, or reduce resolution:
+
+```javascript
+// Instead of:
+codec: 'vp8'  // Larger files
+
+// Use:
+codec: 'vp09.00.10.08'  // 30-40% smaller
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always set alpha: 'keep' explicitly">
+    ```javascript
+    encoder.configure({
+      codec: 'vp09.00.10.08',
+      alpha: 'keep'  // ← Don't forget this!
+    });
+    ```
+
+    The default is `'discard'`, which removes transparency.
+  </Accordion>
+
+  <Accordion title="Use VP9 for better compression">
+    VP9 provides 30-40% better compression than VP8 for alpha video.
+
+    ```javascript
+    codec: 'vp09.00.10.08'  // Recommended
+    ```
+  </Accordion>
+
+  <Accordion title="Increase bitrate for quality">
+    Alpha channels need ~40% more bitrate for equivalent quality:
+
+    ```javascript
+    // RGB: 5 Mbps
+    // RGBA: 7 Mbps
+    ```
+  </Accordion>
+
+  <Accordion title="Test on transparent backgrounds">
+    Always verify alpha quality on different backgrounds:
+    - Solid colors
+    - Gradients
+    - Checkerboard patterns
+    - Real footage
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Alpha Examples" icon="code" href="/examples/alpha-video">
+    Complete alpha video examples
+  </Card>
+  <Card title="VP9 Encoding" icon="video" href="/api-reference/VideoEncoder">
+    VP9 encoder reference
+  </Card>
+  <Card title="Real-World Demo" icon="play" href="/examples/real-world">
+    Production alpha workflows
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/troubleshooting/overview">
+    Common alpha issues
+  </Card>
+</CardGroup>

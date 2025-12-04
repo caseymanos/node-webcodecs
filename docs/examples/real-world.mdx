@@ -1,0 +1,220 @@
+---
+title: "Real-World Examples"
+description: "Production-ready video encoding examples"
+---
+
+## Production Video Encoder
+
+Complete production-ready encoder with error handling, progress tracking, and optimization:
+
+```javascript
+const { VideoEncoder, VideoFrame } = require('node-webcodecs');
+const fs = require('fs');
+const path = require('path');
+
+class ProductionEncoder {
+  constructor(config) {
+    this.config = config;
+    this.chunks = [];
+    this.frameCount = 0;
+    this.startTime = null;
+    this.encoder = null;
+  }
+
+  async encode(frames, outputPath) {
+    console.log(`Starting encoding: ${this.config.width}x${this.config.height} @ ${this.config.bitrate / 1_000_000}Mbps`);
+
+    this.startTime = Date.now();
+
+    // Create encoder
+    this.encoder = new VideoEncoder({
+      output: (chunk, metadata) => this.onChunk(chunk, metadata),
+      error: (err) => this.onError(err)
+    });
+
+    // Check support
+    const support = await VideoEncoder.isConfigSupported(this.config);
+    if (!support.supported) {
+      throw new Error(`Configuration not supported: ${this.config.codec}`);
+    }
+
+    this.encoder.configure(this.config);
+
+    // Encode frames with progress tracking
+    for (let i = 0; i < frames.length; i++) {
+      await this.encodeFrame(frames[i], i);
+
+      // Progress every 30 frames
+      if (i % 30 === 0) {
+        this.logProgress(i, frames.length);
+      }
+    }
+
+    await this.encoder.flush();
+    this.encoder.close();
+
+    // Save output
+    const output = Buffer.concat(this.chunks);
+    fs.writeFileSync(outputPath, output);
+
+    this.logSummary(output.length, frames.length);
+
+    return {
+      path: outputPath,
+      size: output.length,
+      frames: this.frameCount,
+      duration: Date.now() - this.startTime
+    };
+  }
+
+  async encodeFrame(frame, index) {
+    this.encoder.encode(frame, {
+      keyFrame: index % 60 === 0  // Keyframe every 2 seconds
+    });
+    frame.close();
+    this.frameCount++;
+
+    // Backpressure management
+    while (this.encoder.encodeQueueSize > 10) {
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+  }
+
+  onChunk(chunk, metadata) {
+    const buffer = Buffer.alloc(chunk.byteLength);
+    chunk.copyTo(buffer);
+    this.chunks.push(buffer);
+
+    if (metadata?.decoderConfig) {
+      console.log(`  Decoder config: ${metadata.decoderConfig.codec}`);
+    }
+  }
+
+  onError(err) {
+    console.error(`Encoding error: ${err.message}`);
+    throw err;
+  }
+
+  logProgress(current, total) {
+    const percent = ((current / total) * 100).toFixed(1);
+    const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(1);
+    const fps = (current / (Date.now() - this.startTime) * 1000).toFixed(1);
+
+    console.log(`  Progress: ${current}/${total} (${percent}%) | ${elapsed}s | ${fps} fps`);
+  }
+
+  logSummary(size, frames) {
+    const duration = ((Date.now() - this.startTime) / 1000).toFixed(2);
+    const avgFps = (frames / (duration)).toFixed(1);
+    const sizeMB = (size / 1024 / 1024).toFixed(2);
+
+    console.log('\n✓ Encoding complete!');
+    console.log(`  Frames: ${frames}`);
+    console.log(`  Duration: ${duration}s`);
+    console.log(`  Average FPS: ${avgFps}`);
+    console.log(`  Output size: ${sizeMB} MB`);
+    console.log(`  Bitrate: ${(size * 8 / frames * 30 / 1_000_000).toFixed(2)} Mbps`);
+  }
+}
+
+// Usage
+async function main() {
+  const encoder = new ProductionEncoder({
+    codec: 'avc1.42E01E',
+    width: 1920,
+    height: 1080,
+    bitrate: 5_000_000,
+    framerate: 30,
+    hardwareAcceleration: 'prefer-hardware'
+  });
+
+  // Create sample frames
+  const frames = [];
+  for (let i = 0; i < 300; i++) {  // 10 seconds
+    const data = new Uint8Array(1920 * 1080 * 4).fill(128);
+    frames.push(new VideoFrame(data, {
+      format: 'RGBA',
+      codedWidth: 1920,
+      codedHeight: 1080,
+      timestamp: i * 33333
+    }));
+  }
+
+  await encoder.encode(frames, 'output_production.h264');
+}
+
+main().catch(console.error);
+```
+
+## Batch Video Processor
+
+Process multiple videos with error recovery:
+
+```javascript
+class BatchProcessor {
+  constructor(config) {
+    this.config = config;
+    this.results = [];
+  }
+
+  async processVideos(videos) {
+    console.log(`Processing ${videos.length} videos...`);
+
+    for (let i = 0; i < videos.length; i++) {
+      const video = videos[i];
+      console.log(`\n[${i + 1}/${videos.length}] Processing: ${video.name}`);
+
+      try {
+        const result = await this.processVideo(video);
+        this.results.push({ success: true, video: video.name, result });
+        console.log(`  ✓ Success`);
+      } catch (err) {
+        console.error(`  ✗ Failed: ${err.message}`);
+        this.results.push({ success: false, video: video.name, error: err.message });
+      }
+    }
+
+    this.printSummary();
+    return this.results;
+  }
+
+  async processVideo(video) {
+    const encoder = new ProductionEncoder(this.config);
+    return await encoder.encode(video.frames, video.outputPath);
+  }
+
+  printSummary() {
+    const successful = this.results.filter(r => r.success).length;
+    const failed = this.results.filter(r => !r.success).length;
+
+    console.log('\n=== Batch Processing Summary ===');
+    console.log(`  Total: ${this.results.length}`);
+    console.log(`  Successful: ${successful}`);
+    console.log(`  Failed: ${failed}`);
+
+    if (failed > 0) {
+      console.log('\nFailed videos:');
+      this.results.filter(r => !r.success).forEach(r => {
+        console.log(`  - ${r.video}: ${r.error}`);
+      });
+    }
+  }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Hardware Acceleration" icon="microchip" href="/guides/hardware-acceleration">
+    Optimize performance
+  </Card>
+  <Card title="Worker Threads" icon="gears" href="/guides/worker-threads">
+    Parallel processing
+  </Card>
+  <Card title="Backpressure" icon="gauge" href="/guides/backpressure">
+    Manage memory
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/troubleshooting/overview">
+    Common issues
+  </Card>
+</CardGroup>

@@ -1,0 +1,589 @@
+---
+title: "Thumbnail Generation"
+description: "Extract frames from video as images"
+---
+
+## Overview
+
+Generate thumbnails by extracting and saving video frames as images. Common use cases:
+
+- **Video previews** (first frame, middle frame)
+- **Thumbnail grids** (multiple frames at intervals)
+- **Scene detection** (extract on scene changes)
+- **Frame extraction** (export all frames)
+
+## Quick Start
+
+```javascript
+const { VideoDecoder, VideoFrame } = require('node-webcodecs');
+const fs = require('fs');
+const sharp = require('sharp');  // For image processing
+
+async function extractFirstFrame(videoFile) {
+  let firstFrameExtracted = false;
+
+  const decoder = new VideoDecoder({
+    output: async (frame) => {
+      if (!firstFrameExtracted) {
+        // Get pixel data
+        const size = frame.allocationSize({ format: 'RGBA' });
+        const pixels = new Uint8Array(size);
+        frame.copyTo(pixels);
+
+        // Save as PNG
+        await sharp(Buffer.from(pixels), {
+          raw: {
+            width: frame.codedWidth,
+            height: frame.codedHeight,
+            channels: 4
+          }
+        })
+          .png()
+          .toFile('thumbnail.png');
+
+        console.log('✓ Thumbnail saved: thumbnail.png');
+        firstFrameExtracted = true;
+      }
+
+      frame.close();
+    },
+    error: (err) => { throw err; }
+  });
+
+  decoder.configure({
+    codec: 'avc1.42E01E',
+    codedWidth: 1920,
+    codedHeight: 1080
+  });
+
+  // Read and decode video
+  const videoData = fs.readFileSync(videoFile);
+  const chunk = new EncodedVideoChunk({
+    type: 'key',
+    timestamp: 0,
+    data: videoData
+  });
+
+  decoder.decode(chunk);
+  await decoder.flush();
+  decoder.close();
+}
+
+// Usage
+extractFirstFrame('video.h264').catch(console.error);
+```
+
+## Extract Multiple Thumbnails
+
+Generate thumbnails at regular intervals:
+
+```javascript
+async function extractThumbnails(inputChunks, decoderConfig, count = 5) {
+  const frames = [];
+  let frameCount = 0;
+
+  // Decode all frames first
+  const decoder = new VideoDecoder({
+    output: (frame) => {
+      frames.push(frame);
+      frameCount++;
+    },
+    error: (err) => { throw err; }
+  });
+
+  decoder.configure(decoderConfig);
+
+  for (const chunk of inputChunks) {
+    decoder.decode(chunk);
+  }
+
+  await decoder.flush();
+  decoder.close();
+
+  console.log(`Decoded ${frameCount} frames`);
+
+  // Extract evenly spaced thumbnails
+  const interval = Math.floor(frameCount / (count + 1));
+  const thumbnails = [];
+
+  for (let i = 1; i <= count; i++) {
+    const frameIndex = i * interval;
+    const frame = frames[frameIndex];
+
+    if (frame) {
+      const size = frame.allocationSize({ format: 'RGBA' });
+      const pixels = new Uint8Array(size);
+      frame.copyTo(pixels);
+
+      const filename = `thumbnail_${i}.png`;
+      await sharp(Buffer.from(pixels), {
+        raw: {
+          width: frame.codedWidth,
+          height: frame.codedHeight,
+          channels: 4
+        }
+      })
+        .resize(320, 180)  // Resize to thumbnail size
+        .png()
+        .toFile(filename);
+
+      thumbnails.push(filename);
+      console.log(`✓ Saved: ${filename}`);
+    }
+  }
+
+  // Clean up all frames
+  frames.forEach(f => f.close());
+
+  return thumbnails;
+}
+```
+
+## Thumbnail Grid (Sprite Sheet)
+
+Create a single image with multiple thumbnails:
+
+```javascript
+const sharp = require('sharp');
+
+async function createThumbnailGrid(inputChunks, decoderConfig, cols = 4, rows = 3) {
+  const frames = [];
+  const totalThumbs = cols * rows;
+
+  const decoder = new VideoDecoder({
+    output: (frame) => {
+      frames.push(frame);
+    },
+    error: (err) => { throw err; }
+  });
+
+  decoder.configure(decoderConfig);
+
+  for (const chunk of inputChunks) {
+    decoder.decode(chunk);
+  }
+
+  await decoder.flush();
+  decoder.close();
+
+  // Select evenly spaced frames
+  const interval = Math.floor(frames.length / (totalThumbs + 1));
+  const selectedFrames = [];
+
+  for (let i = 1; i <= totalThumbs; i++) {
+    const index = i * interval;
+    if (index < frames.length) {
+      selectedFrames.push(frames[index]);
+    }
+  }
+
+  // Thumbnail dimensions
+  const thumbWidth = 320;
+  const thumbHeight = 180;
+
+  // Convert frames to images
+  const thumbImages = [];
+
+  for (const frame of selectedFrames) {
+    const size = frame.allocationSize({ format: 'RGBA' });
+    const pixels = new Uint8Array(size);
+    frame.copyTo(pixels);
+
+    const resized = await sharp(Buffer.from(pixels), {
+      raw: {
+        width: frame.codedWidth,
+        height: frame.codedHeight,
+        channels: 4
+      }
+    })
+      .resize(thumbWidth, thumbHeight)
+      .raw()
+      .toBuffer();
+
+    thumbImages.push(resized);
+  }
+
+  // Create grid
+  const gridWidth = cols * thumbWidth;
+  const gridHeight = rows * thumbHeight;
+  const grid = Buffer.alloc(gridWidth * gridHeight * 3);  // RGB
+
+  for (let i = 0; i < thumbImages.length; i++) {
+    const row = Math.floor(i / cols);
+    const col = i % cols;
+
+    const thumb = thumbImages[i];
+
+    for (let y = 0; y < thumbHeight; y++) {
+      for (let x = 0; x < thumbWidth; x++) {
+        const srcIdx = (y * thumbWidth + x) * 4;  // RGBA
+        const dstX = col * thumbWidth + x;
+        const dstY = row * thumbHeight + y;
+        const dstIdx = (dstY * gridWidth + dstX) * 3;  // RGB
+
+        grid[dstIdx] = thumb[srcIdx];      // R
+        grid[dstIdx + 1] = thumb[srcIdx + 1];  // G
+        grid[dstIdx + 2] = thumb[srcIdx + 2];  // B
+      }
+    }
+  }
+
+  // Save grid
+  await sharp(grid, {
+    raw: {
+      width: gridWidth,
+      height: gridHeight,
+      channels: 3
+    }
+  })
+    .png()
+    .toFile('thumbnail_grid.png');
+
+  console.log(`✓ Created ${cols}x${rows} thumbnail grid`);
+
+  // Clean up
+  frames.forEach(f => f.close());
+
+  return 'thumbnail_grid.png';
+}
+```
+
+## Extract at Specific Timestamps
+
+Get frames at exact times:
+
+```javascript
+async function extractAtTimestamps(inputChunks, decoderConfig, timestamps) {
+  // timestamps in seconds, e.g., [5, 10, 15, 20]
+
+  const targetTimestamps = timestamps.map(t => t * 1_000_000);  // Convert to microseconds
+  const extractedFrames = [];
+  let currentIndex = 0;
+
+  const decoder = new VideoDecoder({
+    output: (frame) => {
+      // Check if this frame matches a target timestamp
+      if (currentIndex < targetTimestamps.length) {
+        const target = targetTimestamps[currentIndex];
+        const diff = Math.abs(frame.timestamp - target);
+
+        // Within 33ms tolerance (one frame at 30fps)
+        if (diff < 33333) {
+          extractedFrames.push({
+            frame: frame,
+            timestamp: timestamps[currentIndex],
+            index: currentIndex
+          });
+          currentIndex++;
+          return;  // Don't close yet
+        }
+      }
+
+      frame.close();
+    },
+    error: (err) => { throw err; }
+  });
+
+  decoder.configure(decoderConfig);
+
+  for (const chunk of inputChunks) {
+    decoder.decode(chunk);
+  }
+
+  await decoder.flush();
+  decoder.close();
+
+  // Save extracted frames
+  for (const { frame, timestamp, index } of extractedFrames) {
+    const size = frame.allocationSize({ format: 'RGBA' });
+    const pixels = new Uint8Array(size);
+    frame.copyTo(pixels);
+
+    await sharp(Buffer.from(pixels), {
+      raw: {
+        width: frame.codedWidth,
+        height: frame.codedHeight,
+        channels: 4
+      }
+    })
+      .png()
+      .toFile(`frame_at_${timestamp}s.png`);
+
+    console.log(`✓ Extracted frame at ${timestamp}s`);
+    frame.close();
+  }
+
+  return extractedFrames.length;
+}
+
+// Usage
+extractAtTimestamps(chunks, config, [5, 10, 15, 20]).catch(console.error);
+```
+
+## JPEG Thumbnails (Smaller Files)
+
+Use JPEG for smaller thumbnail file sizes:
+
+```javascript
+async function extractJpegThumbnails(inputChunks, decoderConfig, count = 5) {
+  const frames = [];
+
+  const decoder = new VideoDecoder({
+    output: (frame) => {
+      frames.push(frame);
+    },
+    error: (err) => { throw err; }
+  });
+
+  decoder.configure(decoderConfig);
+
+  for (const chunk of inputChunks) {
+    decoder.decode(chunk);
+  }
+
+  await decoder.flush();
+  decoder.close();
+
+  const interval = Math.floor(frames.length / (count + 1));
+
+  for (let i = 1; i <= count; i++) {
+    const frame = frames[i * interval];
+
+    if (frame) {
+      const size = frame.allocationSize({ format: 'RGBA' });
+      const pixels = new Uint8Array(size);
+      frame.copyTo(pixels);
+
+      await sharp(Buffer.from(pixels), {
+        raw: {
+          width: frame.codedWidth,
+          height: frame.codedHeight,
+          channels: 4
+        }
+      })
+        .resize(640, 360)
+        .jpeg({ quality: 85 })  // ← JPEG with 85% quality
+        .toFile(`thumb_${i}.jpg`);
+
+      console.log(`✓ Saved: thumb_${i}.jpg`);
+    }
+  }
+
+  frames.forEach(f => f.close());
+}
+```
+
+## Scene Detection Thumbnails
+
+Extract frames on scene changes:
+
+```javascript
+async function extractSceneChanges(inputChunks, decoderConfig, threshold = 30) {
+  let prevPixels = null;
+  const sceneThumbnails = [];
+  let frameNum = 0;
+
+  const decoder = new VideoDecoder({
+    output: async (frame) => {
+      const size = frame.allocationSize({ format: 'RGBA' });
+      const pixels = new Uint8Array(size);
+      frame.copyTo(pixels);
+
+      // Compare with previous frame
+      if (prevPixels) {
+        const diff = calculateFrameDifference(pixels, prevPixels);
+
+        // Scene change detected
+        if (diff > threshold) {
+          const filename = `scene_${sceneThumbnails.length}.png`;
+
+          await sharp(Buffer.from(pixels), {
+            raw: {
+              width: frame.codedWidth,
+              height: frame.codedHeight,
+              channels: 4
+            }
+          })
+            .resize(320, 180)
+            .png()
+            .toFile(filename);
+
+          sceneThumbnails.push({
+            filename,
+            frameNumber: frameNum,
+            timestamp: frame.timestamp,
+            difference: diff
+          });
+
+          console.log(`✓ Scene change at frame ${frameNum} (diff: ${diff.toFixed(1)}%)`);
+        }
+      }
+
+      prevPixels = pixels;
+      frameNum++;
+      frame.close();
+    },
+    error: (err) => { throw err; }
+  });
+
+  decoder.configure(decoderConfig);
+
+  for (const chunk of inputChunks) {
+    decoder.decode(chunk);
+  }
+
+  await decoder.flush();
+  decoder.close();
+
+  return sceneThumbnails;
+}
+
+// Calculate difference between frames (percentage)
+function calculateFrameDifference(pixels1, pixels2) {
+  let totalDiff = 0;
+  const samples = 1000;  // Sample every Nth pixel for speed
+  const step = Math.floor(pixels1.length / (samples * 4));
+
+  for (let i = 0; i < pixels1.length; i += step * 4) {
+    const r1 = pixels1[i];
+    const g1 = pixels1[i + 1];
+    const b1 = pixels1[i + 2];
+
+    const r2 = pixels2[i];
+    const g2 = pixels2[i + 1];
+    const b2 = pixels2[i + 2];
+
+    const diff = Math.abs(r1 - r2) + Math.abs(g1 - g2) + Math.abs(b1 - b2);
+    totalDiff += diff;
+  }
+
+  // Return percentage difference
+  return (totalDiff / (samples * 3 * 255)) * 100;
+}
+```
+
+## WebP Thumbnails (Best Compression)
+
+Use WebP for smallest file sizes:
+
+```javascript
+async function extractWebPThumbnails(inputChunks, decoderConfig, count = 5) {
+  const frames = [];
+
+  const decoder = new VideoDecoder({
+    output: (frame) => {
+      frames.push(frame);
+    },
+    error: (err) => { throw err; }
+  });
+
+  decoder.configure(decoderConfig);
+
+  for (const chunk of inputChunks) {
+    decoder.decode(chunk);
+  }
+
+  await decoder.flush();
+  decoder.close();
+
+  const interval = Math.floor(frames.length / (count + 1));
+
+  for (let i = 1; i <= count; i++) {
+    const frame = frames[i * interval];
+
+    if (frame) {
+      const size = frame.allocationSize({ format: 'RGBA' });
+      const pixels = new Uint8Array(size);
+      frame.copyTo(pixels);
+
+      await sharp(Buffer.from(pixels), {
+        raw: {
+          width: frame.codedWidth,
+          height: frame.codedHeight,
+          channels: 4
+        }
+      })
+        .resize(640, 360)
+        .webp({ quality: 85 })  // ← WebP format
+        .toFile(`thumb_${i}.webp`);
+
+      console.log(`✓ Saved: thumb_${i}.webp`);
+    }
+  }
+
+  frames.forEach(f => f.close());
+}
+```
+
+## Performance Tips
+
+<AccordionGroup>
+  <Accordion title="Decode only what you need">
+    For first-frame extraction, stop after one frame:
+
+    ```javascript
+    let extracted = false;
+
+    decoder.output = (frame) => {
+      if (!extracted) {
+        saveFrame(frame);
+        extracted = true;
+        decoder.reset();  // Stop decoding
+      }
+      frame.close();
+    };
+    ```
+  </Accordion>
+
+  <Accordion title="Use smaller thumbnail sizes">
+    ```javascript
+    // Instead of full resolution:
+    .resize(1920, 1080)  // Slow, large files
+
+    // Use thumbnail size:
+    .resize(320, 180)  // Fast, small files
+    ```
+  </Accordion>
+
+  <Accordion title="Choose appropriate format">
+    - **PNG**: Lossless, large files
+    - **JPEG**: Lossy, medium files, good quality
+    - **WebP**: Lossy, small files, best compression
+  </Accordion>
+
+  <Accordion title="Process in parallel">
+    ```javascript
+    // Extract multiple frames in parallel
+    const promises = selectedFrames.map((frame, i) =>
+      saveFrameAsThumbnail(frame, i)
+    );
+
+    await Promise.all(promises);
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+- **Always close frames** after extracting pixels
+- **Resize thumbnails** to reduce file size (320x180 or 640x360)
+- **Use JPEG/WebP** for smaller files vs PNG
+- **Limit thumbnail count** to avoid excessive processing
+- **Clean up memory** by closing frames immediately
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Transcoding" icon="arrows-rotate" href="/cookbook/transcode">
+    Process video during extraction
+  </Card>
+  <Card title="Watermarking" icon="stamp" href="/cookbook/watermark">
+    Add watermarks to thumbnails
+  </Card>
+  <Card title="Examples" icon="code" href="/examples/basic-encoding">
+    More code examples
+  </Card>
+  <Card title="API Reference" icon="book" href="/api-reference/VideoDecoder">
+    VideoDecoder documentation
+  </Card>
+</CardGroup>
