@@ -22,10 +22,10 @@
 - **Actual**: Properties retain their values after `close()` is called
 - **Spec Reference**: https://w3c.github.io/webcodecs/#audiodata-interface
 
-### 4. Missing `ondequeue` Event Handler
+### ~~4. Missing `ondequeue` Event Handler~~ (FIXED)
 - **Severity**: Low
 - **Issue**: Per spec, VideoEncoder, VideoDecoder, AudioEncoder, and AudioDecoder should all have an `ondequeue` property for backpressure handling
-- **Actual**: `ondequeue` property doesn't exist on any of these classes
+- **Fix**: Added `ondequeue` getter/setter to all four classes, wired up to dispatch events when queue decreases
 - **Spec Reference**: https://w3c.github.io/webcodecs/#dom-videoencoder-ondequeue
 
 ### 5. Encoding/Decoding After Flush Produces No Output

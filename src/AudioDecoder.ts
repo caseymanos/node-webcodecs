@@ -35,6 +35,7 @@ export class AudioDecoder {
   private _errorCallback: (error: DOMException) => void;
   private _decodeQueueSize: number = 0;
   private _config: AudioDecoderConfig | null = null;
+  private _ondequeue: ((event: Event) => void) | null = null;
 
   static async isConfigSupported(config: AudioDecoderConfig): Promise<AudioDecoderSupport> {
     const supported = isAudioCodecSupported(config.codec);
@@ -66,6 +67,17 @@ export class AudioDecoder {
 
   get decodeQueueSize(): number {
     return this._decodeQueueSize;
+  }
+
+  /**
+   * Event handler for dequeue events
+   */
+  get ondequeue(): ((event: Event) => void) | null {
+    return this._ondequeue;
+  }
+
+  set ondequeue(handler: ((event: Event) => void) | null) {
+    this._ondequeue = handler;
   }
 
   configure(config: AudioDecoderConfig): void {
@@ -173,6 +185,15 @@ export class AudioDecoder {
     timestamp: number
   ): void {
     this._decodeQueueSize = Math.max(0, this._decodeQueueSize - 1);
+    
+    // Dispatch dequeue event
+    if (this._ondequeue) {
+      try {
+        this._ondequeue(new Event('dequeue'));
+      } catch {
+        // Swallow handler errors
+      }
+    }
 
     try {
       const audioData = new AudioData({

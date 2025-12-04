@@ -1406,10 +1406,7 @@ describe('AudioData Format Tests', () => {
 });
 
 describe('Dequeue Event Tests', () => {
-  // Note: ondequeue is part of the WebCodecs spec for backpressure handling.
-  // Not all implementations support it yet.
-
-  it('VideoEncoder should have ondequeue property if supported', () => {
+  it('VideoEncoder should have ondequeue property', () => {
     if (!isWebCodecsAvailable()) {
       expect.fail('WebCodecs API not available');
     }
@@ -1419,13 +1416,19 @@ describe('Dequeue Event Tests', () => {
       error: () => {},
     });
 
-    // ondequeue is optional - just check encoder exists
-    expect(encoder.state).toBe('unconfigured');
+    // ondequeue should be a property that can be set
+    expect('ondequeue' in encoder).toBe(true);
+    expect(encoder.ondequeue).toBeNull();
+
+    // Should be settable
+    const handler = () => {};
+    encoder.ondequeue = handler;
+    expect(encoder.ondequeue).toBe(handler);
 
     encoder.close();
   });
 
-  it('VideoDecoder should have ondequeue property if supported', () => {
+  it('VideoDecoder should have ondequeue property', () => {
     if (!isWebCodecsAvailable()) {
       expect.fail('WebCodecs API not available');
     }
@@ -1435,10 +1438,101 @@ describe('Dequeue Event Tests', () => {
       error: () => {},
     });
 
-    // ondequeue is optional - just check decoder exists
-    expect(decoder.state).toBe('unconfigured');
+    expect('ondequeue' in decoder).toBe(true);
+    expect(decoder.ondequeue).toBeNull();
+
+    const handler = () => {};
+    decoder.ondequeue = handler;
+    expect(decoder.ondequeue).toBe(handler);
 
     decoder.close();
+  });
+
+  it('AudioEncoder should have ondequeue property', () => {
+    if (!isWebCodecsAvailable()) {
+      expect.fail('WebCodecs API not available');
+    }
+
+    const encoder = new AudioEncoder({
+      output: () => {},
+      error: () => {},
+    });
+
+    expect('ondequeue' in encoder).toBe(true);
+    expect(encoder.ondequeue).toBeNull();
+
+    const handler = () => {};
+    encoder.ondequeue = handler;
+    expect(encoder.ondequeue).toBe(handler);
+
+    encoder.close();
+  });
+
+  it('AudioDecoder should have ondequeue property', () => {
+    if (!isWebCodecsAvailable()) {
+      expect.fail('WebCodecs API not available');
+    }
+
+    const decoder = new AudioDecoder({
+      output: () => {},
+      error: () => {},
+    });
+
+    expect('ondequeue' in decoder).toBe(true);
+    expect(decoder.ondequeue).toBeNull();
+
+    const handler = () => {};
+    decoder.ondequeue = handler;
+    expect(decoder.ondequeue).toBe(handler);
+
+    decoder.close();
+  });
+
+  it('VideoEncoder ondequeue should be called during encoding', async () => {
+    if (!isWebCodecsAvailable()) {
+      expect.fail('WebCodecs API not available');
+    }
+
+    let dequeueCount = 0;
+
+    const encoder = new VideoEncoder({
+      output: () => {},
+      error: (e) => { throw e; },
+    });
+
+    encoder.ondequeue = () => {
+      dequeueCount++;
+    };
+
+    encoder.configure({
+      codec: 'vp8',
+      width: 64,
+      height: 64,
+      bitrate: 100_000,
+      framerate: 30,
+    });
+
+    const ySize = 64 * 64;
+    const uvSize = 32 * 32;
+    const data = new Uint8Array(ySize + uvSize * 2);
+    data.fill(128);
+
+    const frame = new VideoFrame(data, {
+      format: 'I420',
+      codedWidth: 64,
+      codedHeight: 64,
+      timestamp: 0,
+    });
+
+    encoder.encode(frame, { keyFrame: true });
+    frame.close();
+
+    await encoder.flush();
+
+    // ondequeue should have been called at least once
+    expect(dequeueCount).toBeGreaterThan(0);
+
+    encoder.close();
   });
 });
 

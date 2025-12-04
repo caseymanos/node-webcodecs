@@ -53,6 +53,7 @@ export class VideoDecoder {
   private _listeners: Map<string, Set<() => void>> = new Map();
   private _useAsync: boolean = true;
   private _nativeCreated: boolean = false;
+  private _ondequeue: ((event: Event) => void) | null = null;
 
   static async isConfigSupported(config: VideoDecoderConfig): Promise<VideoDecoderSupport> {
     // Basic validation first
@@ -112,6 +113,17 @@ export class VideoDecoder {
   }
 
   /**
+   * Event handler for dequeue events
+   */
+  get ondequeue(): ((event: Event) => void) | null {
+    return this._ondequeue;
+  }
+
+  set ondequeue(handler: ((event: Event) => void) | null) {
+    this._ondequeue = handler;
+  }
+
+  /**
    * Minimal EventTarget-style API for 'dequeue' events.
    * Enables compatibility with MediaBunny and browser WebCodecs code.
    */
@@ -148,6 +160,15 @@ export class VideoDecoder {
   }
 
   private _dispatchEvent(type: string): void {
+    // Call the ondequeue handler if it exists
+    if (type === 'dequeue' && this._ondequeue) {
+      try {
+        this._ondequeue(new Event('dequeue'));
+      } catch {
+        // Swallow handler errors
+      }
+    }
+
     const set = this._listeners.get(type);
     if (!set) return;
 

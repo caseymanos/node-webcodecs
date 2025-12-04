@@ -291,6 +291,7 @@ export class VideoEncoder {
   private _listeners: Map<string, Set<() => void>> = new Map();
   private _useAsync: boolean = true;
   private _nativeCreated: boolean = false;
+  private _ondequeue: ((event: Event) => void) | null = null;
 
   /**
    * Check if a VideoEncoder configuration is supported
@@ -434,6 +435,27 @@ export class VideoEncoder {
   }
 
   /**
+   * Event handler for dequeue events
+   * 
+   * Called when an item is removed from the encode queue. Useful for backpressure
+   * management. This is an alternative to using addEventListener('dequeue', ...).
+   * 
+   * @example
+   * ```ts
+   * encoder.ondequeue = () => {
+   *   console.log('Queue size:', encoder.encodeQueueSize);
+   * };
+   * ```
+   */
+  get ondequeue(): ((event: Event) => void) | null {
+    return this._ondequeue;
+  }
+
+  set ondequeue(handler: ((event: Event) => void) | null) {
+    this._ondequeue = handler;
+  }
+
+  /**
    * Add an event listener
    * Currently supports 'dequeue' events fired when encode queue decreases
    *
@@ -487,6 +509,15 @@ export class VideoEncoder {
   }
 
   private _dispatchEvent(type: string): void {
+    // Call the ondequeue handler if it exists
+    if (type === 'dequeue' && this._ondequeue) {
+      try {
+        this._ondequeue(new Event('dequeue'));
+      } catch {
+        // Swallow handler errors
+      }
+    }
+
     const set = this._listeners.get(type);
     if (!set) return;
 
