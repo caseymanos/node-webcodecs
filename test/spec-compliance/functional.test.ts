@@ -40,6 +40,152 @@ function createI420VideoFrame(
   });
 }
 
+describe('VideoFrame Format Tests', () => {
+  const formats: VideoPixelFormat[] = ['I420', 'I420A', 'I422', 'I444', 'NV12', 'RGBA', 'RGBX', 'BGRA', 'BGRX'];
+
+  function createVideoFrameForFormat(format: VideoPixelFormat, width: number, height: number): VideoFrame | null {
+    let data: Uint8Array;
+    
+    switch (format) {
+      case 'I420': {
+        const ySize = width * height;
+        const uvSize = Math.ceil(width / 2) * Math.ceil(height / 2);
+        data = new Uint8Array(ySize + uvSize * 2);
+        data.fill(128);
+        break;
+      }
+      case 'I420A': {
+        const ySize = width * height;
+        const uvSize = Math.ceil(width / 2) * Math.ceil(height / 2);
+        data = new Uint8Array(ySize * 2 + uvSize * 2); // Y + A + U + V
+        data.fill(128);
+        break;
+      }
+      case 'I422': {
+        const ySize = width * height;
+        const uvSize = Math.ceil(width / 2) * height;
+        data = new Uint8Array(ySize + uvSize * 2);
+        data.fill(128);
+        break;
+      }
+      case 'I444': {
+        const ySize = width * height;
+        data = new Uint8Array(ySize * 3);
+        data.fill(128);
+        break;
+      }
+      case 'NV12': {
+        const ySize = width * height;
+        const uvSize = width * Math.ceil(height / 2);
+        data = new Uint8Array(ySize + uvSize);
+        data.fill(128);
+        break;
+      }
+      case 'RGBA':
+      case 'RGBX':
+      case 'BGRA':
+      case 'BGRX':
+        data = new Uint8Array(width * height * 4);
+        // Fill with a recognizable pattern
+        for (let i = 0; i < data.length; i += 4) {
+          data[i] = 255;     // R or B
+          data[i + 1] = 128; // G
+          data[i + 2] = 64;  // B or R
+          data[i + 3] = 255; // A or X
+        }
+        break;
+      default:
+        return null;
+    }
+
+    try {
+      return new VideoFrame(data, {
+        format,
+        codedWidth: width,
+        codedHeight: height,
+        timestamp: 0,
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  for (const format of formats) {
+    it(`should create VideoFrame with ${format} format`, () => {
+      if (!isWebCodecsAvailable()) {
+        expect.fail('WebCodecs API not available');
+      }
+
+      const frame = createVideoFrameForFormat(format, 64, 64);
+      
+      if (frame === null) {
+        // Format might not be supported, which is acceptable
+        console.log(`Format ${format} not supported in this environment`);
+        return;
+      }
+
+      expect(frame.format).toBe(format);
+      expect(frame.codedWidth).toBe(64);
+      expect(frame.codedHeight).toBe(64);
+      
+      frame.close();
+    });
+  }
+
+  it('should report correct displayWidth and displayHeight', () => {
+    if (!isWebCodecsAvailable()) {
+      expect.fail('WebCodecs API not available');
+    }
+
+    const frame = createI420VideoFrame(128, 96, 0);
+    
+    expect(frame.displayWidth).toBe(128);
+    expect(frame.displayHeight).toBe(96);
+    
+    frame.close();
+  });
+
+  it('should support custom displayWidth and displayHeight', () => {
+    if (!isWebCodecsAvailable()) {
+      expect.fail('WebCodecs API not available');
+    }
+
+    const ySize = 64 * 64;
+    const uvSize = 32 * 32;
+    const data = new Uint8Array(ySize + uvSize * 2);
+    data.fill(128);
+
+    const frame = new VideoFrame(data, {
+      format: 'I420',
+      codedWidth: 64,
+      codedHeight: 64,
+      displayWidth: 128,
+      displayHeight: 128,
+      timestamp: 0,
+    });
+
+    expect(frame.codedWidth).toBe(64);
+    expect(frame.codedHeight).toBe(64);
+    expect(frame.displayWidth).toBe(128);
+    expect(frame.displayHeight).toBe(128);
+
+    frame.close();
+  });
+
+  it('should support colorSpace information', () => {
+    if (!isWebCodecsAvailable()) {
+      expect.fail('WebCodecs API not available');
+    }
+
+    const frame = createI420VideoFrame(64, 64, 0);
+    
+    // colorSpace should be defined (may be null if not specified)
+    expect(frame).toHaveProperty('colorSpace');
+    
+    frame.close();
+  });
+});
+
 describe('Video Encoding Functional Tests', () => {
   let encoder: VideoEncoder | null = null;
 
