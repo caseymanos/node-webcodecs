@@ -1,0 +1,220 @@
+---
+title: "ImageDecoder"
+description: "Decode image files into VideoFrame objects for processing"
+---
+
+# ImageDecoder
+
+## Classes
+
+### ImageDecoder
+
+Defined in: [ImageDecoder.ts:42](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L42)
+
+#### Constructors
+
+##### Constructor
+
+> **new ImageDecoder**(`init`): [`ImageDecoder`](#imagedecoder)
+
+Defined in: [ImageDecoder.ts:62](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L62)
+
+###### Parameters
+
+###### init
+
+[`ImageDecoderInit`](#imagedecoderinit)
+
+###### Returns
+
+[`ImageDecoder`](#imagedecoder)
+
+#### Accessors
+
+##### complete
+
+###### Get Signature
+
+> **get** **complete**(): `boolean`
+
+Defined in: [ImageDecoder.ts:164](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L164)
+
+Whether all image data has been received
+
+###### Returns
+
+`boolean`
+
+##### completed
+
+###### Get Signature
+
+> **get** **completed**(): `Promise`\<`void`\>
+
+Defined in: [ImageDecoder.ts:171](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L171)
+
+Promise that resolves when complete becomes true
+
+###### Returns
+
+`Promise`\<`void`\>
+
+##### type
+
+###### Get Signature
+
+> **get** **type**(): `string`
+
+Defined in: [ImageDecoder.ts:178](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L178)
+
+The MIME type of the image
+
+###### Returns
+
+`string`
+
+#### Methods
+
+##### isTypeSupported()
+
+> `static` **isTypeSupported**(`type`): `Promise`\<`boolean`\>
+
+Defined in: [ImageDecoder.ts:55](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L55)
+
+Check if a MIME type is supported for decoding
+
+###### Parameters
+
+###### type
+
+`string`
+
+###### Returns
+
+`Promise`\<`boolean`\>
+
+##### decode()
+
+> **decode**(`options?`): `Promise`\<[`ImageDecodeResult`](#imagedecoderesult)\>
+
+Defined in: [ImageDecoder.ts:185](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L185)
+
+Decode an image frame
+
+###### Parameters
+
+###### options?
+
+[`ImageDecodeOptions`](#imagedecodeoptions)
+
+###### Returns
+
+`Promise`\<[`ImageDecodeResult`](#imagedecoderesult)\>
+
+##### reset()
+
+> **reset**(): `void`
+
+Defined in: [ImageDecoder.ts:213](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L213)
+
+Reset the decoder state
+
+###### Returns
+
+`void`
+
+##### close()
+
+> **close**(): `void`
+
+Defined in: [ImageDecoder.ts:222](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L222)
+
+Close the decoder and release resources
+
+###### Returns
+
+`void`
+
+## Interfaces
+
+### ImageDecodeResult
+
+Defined in: [ImageDecoder.ts:12](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L12)
+
+#### Properties
+
+##### image
+
+> **image**: [`VideoFrame`](VideoFrame.mdx#videoframe)
+
+Defined in: [ImageDecoder.ts:13](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L13)
+
+##### complete
+
+> **complete**: `boolean`
+
+Defined in: [ImageDecoder.ts:14](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L14)
+
+***
+
+### ImageDecodeOptions
+
+Defined in: [ImageDecoder.ts:17](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L17)
+
+#### Properties
+
+##### frameIndex?
+
+> `optional` **frameIndex**: `number`
+
+Defined in: [ImageDecoder.ts:18](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L18)
+
+##### completeFramesOnly?
+
+> `optional` **completeFramesOnly**: `boolean`
+
+Defined in: [ImageDecoder.ts:19](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L19)
+
+***
+
+### ImageDecoderInit
+
+Defined in: [ImageDecoder.ts:22](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L22)
+
+#### Properties
+
+##### data
+
+> **data**: [`BufferSource`](types.mdx#buffersource) \| `ReadableStream`\<[`BufferSource`](types.mdx#buffersource)\>
+
+Defined in: [ImageDecoder.ts:23](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L23)
+
+##### type
+
+> **type**: `string`
+
+Defined in: [ImageDecoder.ts:24](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L24)
+
+##### colorSpaceConversion?
+
+> `optional` **colorSpaceConversion**: `"default"` \| `"none"`
+
+Defined in: [ImageDecoder.ts:25](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L25)
+
+##### desiredWidth?
+
+> `optional` **desiredWidth**: `number`
+
+Defined in: [ImageDecoder.ts:26](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L26)
+
+##### desiredHeight?
+
+> `optional` **desiredHeight**: `number`
+
+Defined in: [ImageDecoder.ts:27](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L27)
+
+##### preferAnimation?
+
+> `optional` **preferAnimation**: `boolean`
+
+Defined in: [ImageDecoder.ts:28](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L28)

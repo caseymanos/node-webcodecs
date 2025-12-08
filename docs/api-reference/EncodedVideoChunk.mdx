@@ -1,0 +1,116 @@
+---
+title: "EncodedVideoChunk"
+description: "Represents a chunk of encoded video data (keyframe or delta)"
+---
+
+# EncodedVideoChunk
+
+## Classes
+
+### EncodedVideoChunk
+
+Defined in: [EncodedVideoChunk.ts:17](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedVideoChunk.ts#L17)
+
+#### Constructors
+
+##### Constructor
+
+> **new EncodedVideoChunk**(`init`): [`EncodedVideoChunk`](#encodedvideochunk)
+
+Defined in: [EncodedVideoChunk.ts:25](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedVideoChunk.ts#L25)
+
+###### Parameters
+
+###### init
+
+[`EncodedVideoChunkInit`](#encodedvideochunkinit)
+
+###### Returns
+
+[`EncodedVideoChunk`](#encodedvideochunk)
+
+#### Properties
+
+##### type
+
+> `readonly` **type**: [`EncodedVideoChunkType`](#encodedvideochunktype)
+
+Defined in: [EncodedVideoChunk.ts:20](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedVideoChunk.ts#L20)
+
+##### timestamp
+
+> `readonly` **timestamp**: `number`
+
+Defined in: [EncodedVideoChunk.ts:21](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedVideoChunk.ts#L21)
+
+##### duration
+
+> `readonly` **duration**: `number` \| `null`
+
+Defined in: [EncodedVideoChunk.ts:22](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedVideoChunk.ts#L22)
+
+##### byteLength
+
+> `readonly` **byteLength**: `number`
+
+Defined in: [EncodedVideoChunk.ts:23](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedVideoChunk.ts#L23)
+
+#### Methods
+
+##### copyTo()
+
+> **copyTo**(`destination`): `void`
+
+Defined in: [EncodedVideoChunk.ts:62](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedVideoChunk.ts#L62)
+
+Copy the encoded data to a destination buffer
+
+###### Parameters
+
+###### destination
+
+[`BufferSource`](types.mdx#buffersource)
+
+###### Returns
+
+`void`
+
+## Interfaces
+
+### EncodedVideoChunkInit
+
+Defined in: [EncodedVideoChunk.ts:10](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedVideoChunk.ts#L10)
+
+#### Properties
+
+##### type
+
+> **type**: [`EncodedVideoChunkType`](#encodedvideochunktype)
+
+Defined in: [EncodedVideoChunk.ts:11](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedVideoChunk.ts#L11)
+
+##### timestamp
+
+> **timestamp**: `number`
+
+Defined in: [EncodedVideoChunk.ts:12](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedVideoChunk.ts#L12)
+
+##### duration?
+
+> `optional` **duration**: `number`
+
+Defined in: [EncodedVideoChunk.ts:13](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedVideoChunk.ts#L13)
+
+##### data
+
+> **data**: [`BufferSource`](types.mdx#buffersource)
+
+Defined in: [EncodedVideoChunk.ts:14](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedVideoChunk.ts#L14)
+
+## Type Aliases
+
+### EncodedVideoChunkType
+
+> **EncodedVideoChunkType** = `"key"` \| `"delta"`
+
+Defined in: [EncodedVideoChunk.ts:8](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedVideoChunk.ts#L8)

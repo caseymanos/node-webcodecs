@@ -1,0 +1,458 @@
+---
+title: "VideoFrame"
+description: "Represents a single video frame with pixel data and metadata"
+---
+
+# VideoFrame
+
+## Classes
+
+### VideoFrame
+
+Defined in: [VideoFrame.ts:62](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L62)
+
+#### Constructors
+
+##### Constructor
+
+> **new VideoFrame**(`data`, `init`): [`VideoFrame`](#videoframe)
+
+Defined in: [VideoFrame.ts:77](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L77)
+
+###### Parameters
+
+###### data
+
+[`BufferSource`](types.mdx#buffersource)
+
+###### init
+
+[`VideoFrameBufferInit`](#videoframebufferinit)
+
+###### Returns
+
+[`VideoFrame`](#videoframe)
+
+##### Constructor
+
+> **new VideoFrame**(`image`, `init?`): [`VideoFrame`](#videoframe)
+
+Defined in: [VideoFrame.ts:78](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L78)
+
+###### Parameters
+
+###### image
+
+[`VideoFrame`](#videoframe)
+
+###### init?
+
+[`VideoFrameInit`](#videoframeinit)
+
+###### Returns
+
+[`VideoFrame`](#videoframe)
+
+#### Properties
+
+##### format
+
+> `readonly` **format**: [`VideoPixelFormat`](#videopixelformat) \| `null`
+
+Defined in: [VideoFrame.ts:67](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L67)
+
+##### codedWidth
+
+> `readonly` **codedWidth**: `number`
+
+Defined in: [VideoFrame.ts:68](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L68)
+
+##### codedHeight
+
+> `readonly` **codedHeight**: `number`
+
+Defined in: [VideoFrame.ts:69](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L69)
+
+##### displayWidth
+
+> `readonly` **displayWidth**: `number`
+
+Defined in: [VideoFrame.ts:70](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L70)
+
+##### displayHeight
+
+> `readonly` **displayHeight**: `number`
+
+Defined in: [VideoFrame.ts:71](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L71)
+
+##### timestamp
+
+> `readonly` **timestamp**: `number`
+
+Defined in: [VideoFrame.ts:72](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L72)
+
+##### duration
+
+> `readonly` **duration**: `number` \| `null`
+
+Defined in: [VideoFrame.ts:73](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L73)
+
+##### colorSpace
+
+> `readonly` **colorSpace**: [`VideoColorSpace`](VideoColorSpace.mdx#videocolorspace)
+
+Defined in: [VideoFrame.ts:74](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L74)
+
+##### visibleRect
+
+> `readonly` **visibleRect**: [`DOMRectReadOnly`](types.mdx#domrectreadonly) \| `null`
+
+Defined in: [VideoFrame.ts:75](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L75)
+
+#### Methods
+
+##### \_getNative()
+
+> **\_getNative**(): `any`
+
+Defined in: [VideoFrame.ts:160](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L160)
+
+Get the native frame handle (internal use only)
+
+###### Returns
+
+`any`
+
+##### allocationSize()
+
+> **allocationSize**(`options?`): `number`
+
+Defined in: [VideoFrame.ts:168](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L168)
+
+Calculate the size in bytes needed to hold the frame data
+
+###### Parameters
+
+###### options?
+
+[`VideoFrameCopyToOptions`](#videoframecopytooptions)
+
+###### Returns
+
+`number`
+
+##### copyTo()
+
+> **copyTo**(`destination`, `options?`): `Promise`\<[`PlaneLayout`](#planelayout)[]\>
+
+Defined in: [VideoFrame.ts:204](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L204)
+
+Copy the frame data to a destination buffer
+
+###### Parameters
+
+###### destination
+
+[`BufferSource`](types.mdx#buffersource)
+
+###### options?
+
+[`VideoFrameCopyToOptions`](#videoframecopytooptions)
+
+###### Returns
+
+`Promise`\<[`PlaneLayout`](#planelayout)[]\>
+
+##### clone()
+
+> **clone**(): [`VideoFrame`](#videoframe)
+
+Defined in: [VideoFrame.ts:233](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L233)
+
+Create a clone of this frame
+
+###### Returns
+
+[`VideoFrame`](#videoframe)
+
+##### close()
+
+> **close**(): `void`
+
+Defined in: [VideoFrame.ts:241](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L241)
+
+Close the frame and release resources
+
+###### Returns
+
+`void`
+
+## Interfaces
+
+### PlaneLayout
+
+Defined in: [VideoFrame.ts:20](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L20)
+
+#### Properties
+
+##### offset
+
+> **offset**: `number`
+
+Defined in: [VideoFrame.ts:21](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L21)
+
+##### stride
+
+> **stride**: `number`
+
+Defined in: [VideoFrame.ts:22](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L22)
+
+***
+
+### VideoFrameInit
+
+Defined in: [VideoFrame.ts:25](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L25)
+
+#### Extended by
+
+- [`VideoFrameBufferInit`](#videoframebufferinit)
+
+#### Properties
+
+##### timestamp
+
+> **timestamp**: `number`
+
+Defined in: [VideoFrame.ts:26](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L26)
+
+##### duration?
+
+> `optional` **duration**: `number`
+
+Defined in: [VideoFrame.ts:27](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L27)
+
+##### format?
+
+> `optional` **format**: [`VideoPixelFormat`](#videopixelformat)
+
+Defined in: [VideoFrame.ts:28](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L28)
+
+##### codedWidth?
+
+> `optional` **codedWidth**: `number`
+
+Defined in: [VideoFrame.ts:29](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L29)
+
+##### codedHeight?
+
+> `optional` **codedHeight**: `number`
+
+Defined in: [VideoFrame.ts:30](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L30)
+
+##### displayWidth?
+
+> `optional` **displayWidth**: `number`
+
+Defined in: [VideoFrame.ts:31](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L31)
+
+##### displayHeight?
+
+> `optional` **displayHeight**: `number`
+
+Defined in: [VideoFrame.ts:32](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L32)
+
+##### visibleRect?
+
+> `optional` **visibleRect**: `object`
+
+Defined in: [VideoFrame.ts:33](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L33)
+
+###### x
+
+> **x**: `number`
+
+###### y
+
+> **y**: `number`
+
+###### width
+
+> **width**: `number`
+
+###### height
+
+> **height**: `number`
+
+##### colorSpace?
+
+> `optional` **colorSpace**: [`VideoColorSpaceInit`](VideoColorSpace.mdx#videocolorspaceinit)
+
+Defined in: [VideoFrame.ts:39](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L39)
+
+***
+
+### VideoFrameBufferInit
+
+Defined in: [VideoFrame.ts:42](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L42)
+
+#### Extends
+
+- [`VideoFrameInit`](#videoframeinit)
+
+#### Properties
+
+##### timestamp
+
+> **timestamp**: `number`
+
+Defined in: [VideoFrame.ts:26](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L26)
+
+###### Inherited from
+
+[`VideoFrameInit`](#videoframeinit).[`timestamp`](#timestamp)
+
+##### duration?
+
+> `optional` **duration**: `number`
+
+Defined in: [VideoFrame.ts:27](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L27)
+
+###### Inherited from
+
+[`VideoFrameInit`](#videoframeinit).[`duration`](#duration)
+
+##### displayWidth?
+
+> `optional` **displayWidth**: `number`
+
+Defined in: [VideoFrame.ts:31](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L31)
+
+###### Inherited from
+
+[`VideoFrameInit`](#videoframeinit).[`displayWidth`](#displaywidth)
+
+##### displayHeight?
+
+> `optional` **displayHeight**: `number`
+
+Defined in: [VideoFrame.ts:32](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L32)
+
+###### Inherited from
+
+[`VideoFrameInit`](#videoframeinit).[`displayHeight`](#displayheight)
+
+##### visibleRect?
+
+> `optional` **visibleRect**: `object`
+
+Defined in: [VideoFrame.ts:33](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L33)
+
+###### x
+
+> **x**: `number`
+
+###### y
+
+> **y**: `number`
+
+###### width
+
+> **width**: `number`
+
+###### height
+
+> **height**: `number`
+
+###### Inherited from
+
+[`VideoFrameInit`](#videoframeinit).[`visibleRect`](#visiblerect)
+
+##### colorSpace?
+
+> `optional` **colorSpace**: [`VideoColorSpaceInit`](VideoColorSpace.mdx#videocolorspaceinit)
+
+Defined in: [VideoFrame.ts:39](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L39)
+
+###### Inherited from
+
+[`VideoFrameInit`](#videoframeinit).[`colorSpace`](#colorspace)
+
+##### format
+
+> **format**: [`VideoPixelFormat`](#videopixelformat)
+
+Defined in: [VideoFrame.ts:43](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L43)
+
+###### Overrides
+
+[`VideoFrameInit`](#videoframeinit).[`format`](#format)
+
+##### codedWidth
+
+> **codedWidth**: `number`
+
+Defined in: [VideoFrame.ts:44](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L44)
+
+###### Overrides
+
+[`VideoFrameInit`](#videoframeinit).[`codedWidth`](#codedwidth)
+
+##### codedHeight
+
+> **codedHeight**: `number`
+
+Defined in: [VideoFrame.ts:45](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L45)
+
+###### Overrides
+
+[`VideoFrameInit`](#videoframeinit).[`codedHeight`](#codedheight)
+
+***
+
+### VideoFrameCopyToOptions
+
+Defined in: [VideoFrame.ts:48](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L48)
+
+#### Properties
+
+##### rect?
+
+> `optional` **rect**: `object`
+
+Defined in: [VideoFrame.ts:49](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L49)
+
+###### x
+
+> **x**: `number`
+
+###### y
+
+> **y**: `number`
+
+###### width
+
+> **width**: `number`
+
+###### height
+
+> **height**: `number`
+
+##### layout?
+
+> `optional` **layout**: [`PlaneLayout`](#planelayout)[]
+
+Defined in: [VideoFrame.ts:55](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L55)
+
+##### format?
+
+> `optional` **format**: [`VideoPixelFormat`](#videopixelformat)
+
+Defined in: [VideoFrame.ts:56](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L56)
+
+## Type Aliases
+
+### VideoPixelFormat
+
+> **VideoPixelFormat** = `"I420"` \| `"I420A"` \| `"I422"` \| `"I444"` \| `"NV12"` \| `"RGBA"` \| `"RGBX"` \| `"BGRA"` \| `"BGRX"`
+
+Defined in: [VideoFrame.ts:9](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L9)

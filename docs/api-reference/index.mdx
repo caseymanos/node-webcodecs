@@ -1,0 +1,420 @@
+---
+title: "API Overview"
+description: "Complete API reference for node-webcodecs"
+---
+
+# API Overview
+
+## Functions
+
+### getFFmpegVersion()
+
+> **getFFmpegVersion**(): \{ `avcodec`: `string`; `avcodecVersion`: `string`; \} \| `null`
+
+Defined in: [index.ts:79](https://github.com/caseymanos/node-webcodecs/blob/master/src/index.ts#L79)
+
+Get FFmpeg version information
+
+#### Returns
+
+\{ `avcodec`: `string`; `avcodecVersion`: `string`; \} \| `null`
+
+***
+
+### listCodecs()
+
+> **listCodecs**(): \{ `encoders`: `object`[]; `decoders`: `object`[]; \} \| `null`
+
+Defined in: [index.ts:89](https://github.com/caseymanos/node-webcodecs/blob/master/src/index.ts#L89)
+
+List available codecs
+
+#### Returns
+
+\{ `encoders`: `object`[]; `decoders`: `object`[]; \} \| `null`
+
+***
+
+### hasCodec()
+
+> **hasCodec**(`codecName`, `type`): `boolean`
+
+Defined in: [index.ts:102](https://github.com/caseymanos/node-webcodecs/blob/master/src/index.ts#L102)
+
+Check if a specific codec is available
+
+#### Parameters
+
+##### codecName
+
+`string`
+
+##### type
+
+`"encoder"` | `"decoder"`
+
+#### Returns
+
+`boolean`
+
+***
+
+### isNativeAvailable()
+
+> **isNativeAvailable**(): `boolean`
+
+Defined in: [index.ts:112](https://github.com/caseymanos/node-webcodecs/blob/master/src/index.ts#L112)
+
+Check if native addon is available
+
+#### Returns
+
+`boolean`
+
+## References
+
+### VideoFrame
+
+Re-exports [VideoFrame](VideoFrame.mdx#videoframe)
+
+***
+
+### VideoFrameInit
+
+Re-exports [VideoFrameInit](VideoFrame.mdx#videoframeinit)
+
+***
+
+### VideoFrameBufferInit
+
+Re-exports [VideoFrameBufferInit](VideoFrame.mdx#videoframebufferinit)
+
+***
+
+### VideoPixelFormat
+
+Re-exports [VideoPixelFormat](VideoFrame.mdx#videopixelformat)
+
+***
+
+### PlaneLayout
+
+Re-exports [PlaneLayout](VideoFrame.mdx#planelayout)
+
+***
+
+### VideoFrameCopyToOptions
+
+Re-exports [VideoFrameCopyToOptions](VideoFrame.mdx#videoframecopytooptions)
+
+***
+
+### AudioData
+
+Re-exports [AudioData](AudioData.mdx#audiodata)
+
+***
+
+### AudioDataInit
+
+Re-exports [AudioDataInit](AudioData.mdx#audiodatainit)
+
+***
+
+### AudioDataCopyToOptions
+
+Re-exports [AudioDataCopyToOptions](AudioData.mdx#audiodatacopytooptions)
+
+***
+
+### AudioSampleFormat
+
+Re-exports [AudioSampleFormat](AudioData.mdx#audiosampleformat)
+
+***
+
+### EncodedVideoChunk
+
+Re-exports [EncodedVideoChunk](EncodedVideoChunk.mdx#encodedvideochunk)
+
+***
+
+### EncodedVideoChunkInit
+
+Re-exports [EncodedVideoChunkInit](EncodedVideoChunk.mdx#encodedvideochunkinit)
+
+***
+
+### EncodedVideoChunkType
+
+Re-exports [EncodedVideoChunkType](EncodedVideoChunk.mdx#encodedvideochunktype)
+
+***
+
+### EncodedAudioChunk
+
+Re-exports [EncodedAudioChunk](EncodedAudioChunk.mdx#encodedaudiochunk)
+
+***
+
+### EncodedAudioChunkInit
+
+Re-exports [EncodedAudioChunkInit](EncodedAudioChunk.mdx#encodedaudiochunkinit)
+
+***
+
+### EncodedAudioChunkType
+
+Re-exports [EncodedAudioChunkType](EncodedAudioChunk.mdx#encodedaudiochunktype)
+
+***
+
+### VideoColorSpace
+
+Re-exports [VideoColorSpace](VideoColorSpace.mdx#videocolorspace)
+
+***
+
+### VideoColorSpaceInit
+
+Re-exports [VideoColorSpaceInit](VideoColorSpace.mdx#videocolorspaceinit)
+
+***
+
+### VideoColorPrimaries
+
+Re-exports [VideoColorPrimaries](VideoColorSpace.mdx#videocolorprimaries)
+
+***
+
+### VideoTransferCharacteristics
+
+Re-exports [VideoTransferCharacteristics](VideoColorSpace.mdx#videotransfercharacteristics)
+
+***
+
+### VideoMatrixCoefficients
+
+Re-exports [VideoMatrixCoefficients](VideoColorSpace.mdx#videomatrixcoefficients)
+
+***
+
+### ImageDecoder
+
+Re-exports [ImageDecoder](ImageDecoder.mdx#imagedecoder)
+
+***
+
+### ImageDecoderInit
+
+Re-exports [ImageDecoderInit](ImageDecoder.mdx#imagedecoderinit)
+
+***
+
+### ImageDecodeResult
+
+Re-exports [ImageDecodeResult](ImageDecoder.mdx#imagedecoderesult)
+
+***
+
+### ImageDecodeOptions
+
+Re-exports [ImageDecodeOptions](ImageDecoder.mdx#imagedecodeoptions)
+
+***
+
+### VideoEncoder
+
+Re-exports [VideoEncoder](VideoEncoder.mdx#videoencoder)
+
+***
+
+### VideoEncoderConfig
+
+Re-exports [VideoEncoderConfig](VideoEncoder.mdx#videoencoderconfig)
+
+***
+
+### VideoEncoderInit
+
+Re-exports [VideoEncoderInit](VideoEncoder.mdx#videoencoderinit)
+
+***
+
+### VideoEncoderSupport
+
+Re-exports [VideoEncoderSupport](VideoEncoder.mdx#videoencodersupport)
+
+***
+
+### VideoEncoderOutputMetadata
+
+Re-exports [VideoEncoderOutputMetadata](VideoEncoder.mdx#videoencoderoutputmetadata)
+
+***
+
+### VideoEncoderEncodeOptions
+
+Re-exports [VideoEncoderEncodeOptions](VideoEncoder.mdx#videoencoderencodeoptions)
+
+***
+
+### LatencyMode
+
+Re-exports [LatencyMode](VideoEncoder.mdx#latencymode)
+
+***
+
+### BitrateMode
+
+Re-exports [BitrateMode](VideoEncoder.mdx#bitratemode)
+
+***
+
+### AlphaOption
+
+Re-exports [AlphaOption](VideoEncoder.mdx#alphaoption)
+
+***
+
+### VideoDecoder
+
+Re-exports [VideoDecoder](VideoDecoder.mdx#videodecoder)
+
+***
+
+### VideoDecoderConfig
+
+Re-exports [VideoDecoderConfig](VideoDecoder.mdx#videodecoderconfig)
+
+***
+
+### VideoDecoderInit
+
+Re-exports [VideoDecoderInit](VideoDecoder.mdx#videodecoderinit)
+
+***
+
+### VideoDecoderSupport
+
+Re-exports [VideoDecoderSupport](VideoDecoder.mdx#videodecodersupport)
+
+***
+
+### AudioEncoder
+
+Re-exports [AudioEncoder](AudioEncoder.mdx#audioencoder)
+
+***
+
+### AudioEncoderConfig
+
+Re-exports [AudioEncoderConfig](AudioEncoder.mdx#audioencoderconfig)
+
+***
+
+### AudioEncoderInit
+
+Re-exports [AudioEncoderInit](AudioEncoder.mdx#audioencoderinit)
+
+***
+
+### AudioEncoderSupport
+
+Re-exports [AudioEncoderSupport](AudioEncoder.mdx#audioencodersupport)
+
+***
+
+### AudioEncoderOutputMetadata
+
+Re-exports [AudioEncoderOutputMetadata](AudioEncoder.mdx#audioencoderoutputmetadata)
+
+***
+
+### AudioBitrateMode
+
+Re-exports [AudioBitrateMode](AudioEncoder.mdx#audiobitratemode)
+
+***
+
+### AudioDecoder
+
+Re-exports [AudioDecoder](AudioDecoder.mdx#audiodecoder)
+
+***
+
+### AudioDecoderConfig
+
+Re-exports [AudioDecoderConfig](AudioDecoder.mdx#audiodecoderconfig)
+
+***
+
+### AudioDecoderInit
+
+Re-exports [AudioDecoderInit](AudioDecoder.mdx#audiodecoderinit)
+
+***
+
+### AudioDecoderSupport
+
+Re-exports [AudioDecoderSupport](AudioDecoder.mdx#audiodecodersupport)
+
+***
+
+### isVideoCodecSupported
+
+Re-exports [isVideoCodecSupported](codec-registry.mdx#isvideocodecsupported)
+
+***
+
+### isAudioCodecSupported
+
+Re-exports [isAudioCodecSupported](codec-registry.mdx#isaudiocodecsupported)
+
+***
+
+### getFFmpegVideoCodec
+
+Re-exports [getFFmpegVideoCodec](codec-registry.mdx#getffmpegvideocodec)
+
+***
+
+### getFFmpegAudioCodec
+
+Re-exports [getFFmpegAudioCodec](codec-registry.mdx#getffmpegaudiocodec)
+
+***
+
+### parseAvcCodecString
+
+Re-exports [parseAvcCodecString](codec-registry.mdx#parseavccodecstring)
+
+***
+
+### parseAacCodecString
+
+Re-exports [parseAacCodecString](codec-registry.mdx#parseaaccodecstring)
+
+***
+
+### parseVp9CodecString
+
+Re-exports [parseVp9CodecString](codec-registry.mdx#parsevp9codecstring)
+
+***
+
+### CodecState
+
+Re-exports [CodecState](types.mdx#codecstate)
+
+***
+
+### BufferSource
+
+Re-exports [BufferSource](types.mdx#buffersource)
+
+***
+
+### DOMRectReadOnly
+
+Re-exports [DOMRectReadOnly](types.mdx#domrectreadonly)

@@ -1,0 +1,324 @@
+---
+title: "AudioEncoder"
+description: "Encode AudioData objects into EncodedAudioChunk for AAC, Opus, and MP3"
+---
+
+# AudioEncoder
+
+## Classes
+
+### AudioEncoder
+
+Defined in: [AudioEncoder.ts:43](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L43)
+
+#### Constructors
+
+##### Constructor
+
+> **new AudioEncoder**(`init`): [`AudioEncoder`](#audioencoder)
+
+Defined in: [AudioEncoder.ts:60](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L60)
+
+###### Parameters
+
+###### init
+
+[`AudioEncoderInit`](#audioencoderinit)
+
+###### Returns
+
+[`AudioEncoder`](#audioencoder)
+
+#### Accessors
+
+##### state
+
+###### Get Signature
+
+> **get** **state**(): [`CodecState`](types.mdx#codecstate)
+
+Defined in: [AudioEncoder.ts:79](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L79)
+
+###### Returns
+
+[`CodecState`](types.mdx#codecstate)
+
+##### encodeQueueSize
+
+###### Get Signature
+
+> **get** **encodeQueueSize**(): `number`
+
+Defined in: [AudioEncoder.ts:83](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L83)
+
+###### Returns
+
+`number`
+
+#### Methods
+
+##### isConfigSupported()
+
+> `static` **isConfigSupported**(`config`): `Promise`\<[`AudioEncoderSupport`](#audioencodersupport)\>
+
+Defined in: [AudioEncoder.ts:53](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L53)
+
+###### Parameters
+
+###### config
+
+[`AudioEncoderConfig`](#audioencoderconfig)
+
+###### Returns
+
+`Promise`\<[`AudioEncoderSupport`](#audioencodersupport)\>
+
+##### addEventListener()
+
+> **addEventListener**(`type`, `listener`, `options?`): `void`
+
+Defined in: [AudioEncoder.ts:90](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L90)
+
+Minimal EventTarget-style API for 'dequeue' events, mirroring VideoEncoder.
+
+###### Parameters
+
+###### type
+
+`string`
+
+###### listener
+
+() => `void`
+
+###### options?
+
+###### once?
+
+`boolean`
+
+###### Returns
+
+`void`
+
+##### removeEventListener()
+
+> **removeEventListener**(`type`, `listener`): `void`
+
+Defined in: [AudioEncoder.ts:109](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L109)
+
+###### Parameters
+
+###### type
+
+`string`
+
+###### listener
+
+() => `void`
+
+###### Returns
+
+`void`
+
+##### configure()
+
+> **configure**(`config`): `void`
+
+Defined in: [AudioEncoder.ts:135](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L135)
+
+###### Parameters
+
+###### config
+
+[`AudioEncoderConfig`](#audioencoderconfig)
+
+###### Returns
+
+`void`
+
+##### encode()
+
+> **encode**(`data`): `void`
+
+Defined in: [AudioEncoder.ts:167](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L167)
+
+###### Parameters
+
+###### data
+
+[`AudioData`](AudioData.mdx#audiodata)
+
+###### Returns
+
+`void`
+
+##### flush()
+
+> **flush**(): `Promise`\<`void`\>
+
+Defined in: [AudioEncoder.ts:188](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L188)
+
+###### Returns
+
+`Promise`\<`void`\>
+
+##### reset()
+
+> **reset**(): `void`
+
+Defined in: [AudioEncoder.ts:204](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L204)
+
+###### Returns
+
+`void`
+
+##### close()
+
+> **close**(): `void`
+
+Defined in: [AudioEncoder.ts:218](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L218)
+
+###### Returns
+
+`void`
+
+## Interfaces
+
+### AudioEncoderConfig
+
+Defined in: [AudioEncoder.ts:13](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L13)
+
+#### Properties
+
+##### codec
+
+> **codec**: `string`
+
+Defined in: [AudioEncoder.ts:14](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L14)
+
+##### sampleRate
+
+> **sampleRate**: `number`
+
+Defined in: [AudioEncoder.ts:15](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L15)
+
+##### numberOfChannels
+
+> **numberOfChannels**: `number`
+
+Defined in: [AudioEncoder.ts:16](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L16)
+
+##### bitrate?
+
+> `optional` **bitrate**: `number`
+
+Defined in: [AudioEncoder.ts:17](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L17)
+
+##### bitrateMode?
+
+> `optional` **bitrateMode**: [`AudioBitrateMode`](#audiobitratemode)
+
+Defined in: [AudioEncoder.ts:18](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L18)
+
+***
+
+### AudioEncoderInit
+
+Defined in: [AudioEncoder.ts:21](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L21)
+
+#### Properties
+
+##### output()
+
+> **output**: (`chunk`, `metadata?`) => `void`
+
+Defined in: [AudioEncoder.ts:22](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L22)
+
+###### Parameters
+
+###### chunk
+
+[`EncodedAudioChunk`](EncodedAudioChunk.mdx#encodedaudiochunk)
+
+###### metadata?
+
+[`AudioEncoderOutputMetadata`](#audioencoderoutputmetadata)
+
+###### Returns
+
+`void`
+
+##### error()
+
+> **error**: (`error`) => `void`
+
+Defined in: [AudioEncoder.ts:23](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L23)
+
+###### Parameters
+
+###### error
+
+[`WebCodecsDOMException`](types.mdx#webcodecsdomexception)
+
+###### Returns
+
+`void`
+
+***
+
+### AudioEncoderOutputMetadata
+
+Defined in: [AudioEncoder.ts:26](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L26)
+
+#### Properties
+
+##### decoderConfig?
+
+> `optional` **decoderConfig**: `object`
+
+Defined in: [AudioEncoder.ts:27](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L27)
+
+###### codec
+
+> **codec**: `string`
+
+###### sampleRate
+
+> **sampleRate**: `number`
+
+###### numberOfChannels
+
+> **numberOfChannels**: `number`
+
+###### description?
+
+> `optional` **description**: `ArrayBuffer`
+
+***
+
+### AudioEncoderSupport
+
+Defined in: [AudioEncoder.ts:35](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L35)
+
+#### Properties
+
+##### supported
+
+> **supported**: `boolean`
+
+Defined in: [AudioEncoder.ts:36](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L36)
+
+##### config
+
+> **config**: [`AudioEncoderConfig`](#audioencoderconfig)
+
+Defined in: [AudioEncoder.ts:37](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L37)
+
+## Type Aliases
+
+### AudioBitrateMode
+
+> **AudioBitrateMode** = `"constant"` \| `"variable"`
+
+Defined in: [AudioEncoder.ts:11](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L11)

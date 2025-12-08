@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 32">
+  <rect x="0" y="4" width="24" height="24" fill="none" stroke="#00ffc8" stroke-width="2"/>
+  <path d="M8 11 L8 21 L16 16 Z" fill="#00ffc8"/>
+  <text x="32" y="22" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" fill="#0a0a0b">node-webcodecs</text>
+</svg>

@@ -1,0 +1,939 @@
+---
+title: "VideoEncoder"
+description: "Encode VideoFrame objects into EncodedVideoChunk for H.264, VP8, VP9, and AV1"
+---
+
+# VideoEncoder
+
+## Classes
+
+### VideoEncoder
+
+Defined in: [VideoEncoder.ts:283](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L283)
+
+VideoEncoder encodes VideoFrame objects into EncodedVideoChunk objects
+
+This class implements the W3C WebCodecs VideoEncoder interface, providing
+hardware-accelerated video encoding via FFmpeg.
+
+#### Examples
+
+```ts
+import { VideoEncoder, VideoFrame } from 'node-webcodecs';
+
+const encoder = new VideoEncoder({
+  output: (chunk, metadata) => {
+    console.log(`Encoded ${chunk.byteLength} bytes`);
+    // Save chunk to file or stream
+  },
+  error: (err) => console.error('Encoding error:', err)
+});
+
+encoder.configure({
+  codec: 'avc1.42E01E',
+  width: 1920,
+  height: 1080,
+  bitrate: 5_000_000
+});
+
+const frame = new VideoFrame(buffer, {
+  format: 'RGBA',
+  codedWidth: 1920,
+  codedHeight: 1080,
+  timestamp: 0
+});
+
+encoder.encode(frame);
+frame.close();  // Important: prevent memory leaks
+
+await encoder.flush();
+encoder.close();
+```
+
+```ts
+encoder.configure({
+  codec: 'h264_videotoolbox',  // macOS VideoToolbox
+  // codec: 'h264_nvenc',       // NVIDIA NVENC
+  // codec: 'h264_qsv',         // Intel QuickSync
+  width: 1920,
+  height: 1080
+});
+```
+
+#### See
+
+https://w3c.github.io/webcodecs/#videoencoder
+
+#### Constructors
+
+##### Constructor
+
+> **new VideoEncoder**(`init`): [`VideoEncoder`](#videoencoder)
+
+Defined in: [VideoEncoder.ts:390](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L390)
+
+Create a new VideoEncoder
+
+###### Parameters
+
+###### init
+
+[`VideoEncoderInit`](#videoencoderinit)
+
+Initialization callbacks for output and errors
+
+###### Returns
+
+[`VideoEncoder`](#videoencoder)
+
+###### Throws
+
+TypeError if callbacks are not functions
+
+###### Example
+
+```ts
+const encoder = new VideoEncoder({
+  output: (chunk, metadata) => {
+    // Handle encoded chunk
+    if (metadata?.decoderConfig) {
+      console.log('Received decoder config:', metadata.decoderConfig);
+    }
+  },
+  error: (err) => {
+    console.error('Encoding failed:', err.message);
+  }
+});
+```
+
+#### Accessors
+
+##### state
+
+###### Get Signature
+
+> **get** **state**(): [`CodecState`](types.mdx#codecstate)
+
+Defined in: [VideoEncoder.ts:410](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L410)
+
+Current encoder state
+- `unconfigured`: Not configured yet, or reset() was called
+- `configured`: Ready to encode frames
+- `closed`: Encoder has been closed and cannot be used
+
+###### Returns
+
+[`CodecState`](types.mdx#codecstate)
+
+##### encodeQueueSize
+
+###### Get Signature
+
+> **get** **encodeQueueSize**(): `number`
+
+Defined in: [VideoEncoder.ts:432](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L432)
+
+Number of pending encode operations
+Useful for backpressure management in async mode
+
+###### Example
+
+```ts
+for (const frame of frames) {
+  encoder.encode(frame);
+
+  // Wait if queue gets too large
+  if (encoder.encodeQueueSize > 10) {
+    await new Promise(resolve => {
+      encoder.addEventListener('dequeue', resolve, { once: true });
+    });
+  }
+}
+```
+
+###### Returns
+
+`number`
+
+#### Methods
+
+##### isConfigSupported()
+
+> `static` **isConfigSupported**(`config`): `Promise`\<[`VideoEncoderSupport`](#videoencodersupport)\>
+
+Defined in: [VideoEncoder.ts:334](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L334)
+
+Check if a VideoEncoder configuration is supported
+
+Tests whether the specified codec and parameters can be encoded on this platform.
+This method probes the native FFmpeg installation for codec availability.
+
+###### Parameters
+
+###### config
+
+[`VideoEncoderConfig`](#videoencoderconfig)
+
+Configuration to test
+
+###### Returns
+
+`Promise`\<[`VideoEncoderSupport`](#videoencodersupport)\>
+
+Promise resolving to support status and normalized config
+
+###### Examples
+
+```ts
+const result = await VideoEncoder.isConfigSupported({
+  codec: 'avc1.42E01E',
+  width: 1920,
+  height: 1080
+});
+
+if (result.supported) {
+  console.log('H.264 encoding is supported');
+} else {
+  console.log('H.264 encoding is NOT supported');
+}
+```
+
+```ts
+const hwSupport = await VideoEncoder.isConfigSupported({
+  codec: 'h264_videotoolbox',
+  width: 3840,
+  height: 2160,
+  hardwareAcceleration: 'prefer-hardware'
+});
+
+if (!hwSupport.supported) {
+  // Fallback to software encoder
+  encoder.configure({ codec: 'avc1.42E01E', ... });
+}
+```
+
+##### addEventListener()
+
+> **addEventListener**(`type`, `listener`, `options?`): `void`
+
+Defined in: [VideoEncoder.ts:451](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L451)
+
+Add an event listener
+Currently supports 'dequeue' events fired when encode queue decreases
+
+###### Parameters
+
+###### type
+
+`string`
+
+Event type ('dequeue')
+
+###### listener
+
+() => `void`
+
+Callback to invoke
+
+###### options?
+
+Event listener options
+
+###### once?
+
+`boolean`
+
+###### Returns
+
+`void`
+
+###### Example
+
+```ts
+encoder.addEventListener('dequeue', () => {
+  console.log('Queue size:', encoder.encodeQueueSize);
+});
+```
+
+##### removeEventListener()
+
+> **removeEventListener**(`type`, `listener`): `void`
+
+Defined in: [VideoEncoder.ts:476](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L476)
+
+Remove an event listener
+
+###### Parameters
+
+###### type
+
+`string`
+
+Event type ('dequeue')
+
+###### listener
+
+() => `void`
+
+Callback to remove
+
+###### Returns
+
+`void`
+
+##### configure()
+
+> **configure**(`config`): `void`
+
+Defined in: [VideoEncoder.ts:549](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L549)
+
+Configure the encoder with codec parameters
+
+Must be called before encoding frames. Can be called multiple times to
+reconfigure (e.g., to change bitrate or resolution).
+
+###### Parameters
+
+###### config
+
+[`VideoEncoderConfig`](#videoencoderconfig)
+
+Encoder configuration
+
+###### Returns
+
+`void`
+
+###### Throws
+
+DOMException if encoder is closed
+
+###### Throws
+
+DOMException if codec is not supported
+
+###### Throws
+
+DOMException if dimensions are invalid
+
+###### Examples
+
+```ts
+encoder.configure({
+  codec: 'avc1.42E01E',
+  width: 1920,
+  height: 1080,
+  bitrate: 5_000_000,
+  framerate: 30
+});
+```
+
+```ts
+encoder.configure({
+  codec: 'h264_videotoolbox',  // macOS
+  width: 1920,
+  height: 1080,
+  hardwareAcceleration: 'prefer-hardware'
+});
+```
+
+```ts
+encoder.configure({
+  codec: 'vp09.00.10.08',
+  width: 3840,
+  height: 2160,
+  bitrate: 20_000_000,
+  colorSpace: {
+    primaries: 'bt2020',
+    transfer: 'pq',
+    matrix: 'bt2020-ncl'
+  }
+});
+```
+
+##### encode()
+
+> **encode**(`frame`, `options?`): `void`
+
+Defined in: [VideoEncoder.ts:673](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L673)
+
+Encode a video frame
+
+Queues a frame for encoding. In async mode (default), encoding happens in
+a worker thread and the output callback is invoked when complete.
+
+**IMPORTANT**: Always call `frame.close()` after encoding to prevent memory leaks.
+
+###### Parameters
+
+###### frame
+
+[`VideoFrame`](VideoFrame.mdx#videoframe)
+
+VideoFrame to encode
+
+###### options?
+
+[`VideoEncoderEncodeOptions`](#videoencoderencodeoptions)
+
+Encoding options (keyFrame)
+
+###### Returns
+
+`void`
+
+###### Throws
+
+DOMException if encoder is not configured
+
+###### Throws
+
+DOMException if frame is invalid
+
+###### Examples
+
+```ts
+const frame = new VideoFrame(buffer, {
+  format: 'RGBA',
+  codedWidth: 1920,
+  codedHeight: 1080,
+  timestamp: 0
+});
+
+encoder.encode(frame);
+frame.close();  // MUST close to prevent memory leak
+```
+
+```ts
+// Force first frame to be keyframe
+encoder.encode(frame, { keyFrame: true });
+frame.close();
+
+// Keyframe every 2 seconds at 30fps
+for (let i = 0; i < frames.length; i++) {
+  encoder.encode(frames[i], { keyFrame: i % 60 === 0 });
+  frames[i].close();
+}
+```
+
+##### flush()
+
+> **flush**(): `Promise`\<`void`\>
+
+Defined in: [VideoEncoder.ts:715](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L715)
+
+Wait for all pending encodes to complete
+
+Flushes the internal encode queue and returns a promise that resolves when
+all frames have been encoded. Call this before closing the encoder to ensure
+no frames are lost.
+
+###### Returns
+
+`Promise`\<`void`\>
+
+Promise that resolves when flush is complete
+
+###### Throws
+
+DOMException if encoder is not configured
+
+###### Throws
+
+DOMException if encoding fails
+
+###### Example
+
+```ts
+// Encode all frames
+for (const frame of frames) {
+  encoder.encode(frame);
+  frame.close();
+}
+
+// Wait for encoding to finish
+await encoder.flush();
+
+console.log('All frames encoded!');
+encoder.close();
+```
+
+##### reset()
+
+> **reset**(): `void`
+
+Defined in: [VideoEncoder.ts:750](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L750)
+
+Reset the encoder to unconfigured state
+
+Aborts all pending encode operations and resets to unconfigured state.
+You must call `configure()` again before encoding more frames.
+
+###### Returns
+
+`void`
+
+###### Throws
+
+DOMException if encoder is closed
+
+###### Example
+
+```ts
+encoder.configure({ codec: 'avc1.42E01E', width: 1920, height: 1080 });
+encoder.encode(frame1);
+
+// Abort and reconfigure with different settings
+encoder.reset();
+encoder.configure({ codec: 'vp09.00.10.08', width: 1280, height: 720 });
+encoder.encode(frame2);
+```
+
+##### close()
+
+> **close**(): `void`
+
+Defined in: [VideoEncoder.ts:784](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L784)
+
+Close the encoder and release resources
+
+Closes the encoder and frees all native resources. The encoder cannot be
+used after calling close(). Any pending encode operations are aborted.
+
+###### Returns
+
+`void`
+
+###### Example
+
+```ts
+// Encode frames
+for (const frame of frames) {
+  encoder.encode(frame);
+  frame.close();
+}
+
+await encoder.flush();
+encoder.close();  // Release resources
+
+// encoder.encode() will now throw
+```
+
+## Interfaces
+
+### VideoEncoderConfig
+
+Defined in: [VideoEncoder.ts:38](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L38)
+
+VideoEncoder configuration options
+
+#### See
+
+https://w3c.github.io/webcodecs/#dictdef-videoencoderconfig
+
+#### Properties
+
+##### codec
+
+> **codec**: `string`
+
+Defined in: [VideoEncoder.ts:50](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L50)
+
+Codec string (e.g., 'avc1.42E01E', 'vp09.00.10.08', 'h264_videotoolbox')
+Supports both WebCodecs MIME types and FFmpeg codec names
+
+###### Example
+
+```ts
+codec: 'avc1.42E01E'  // H.264 Baseline Level 3.0
+codec: 'vp09.00.10.08'  // VP9 Profile 0
+codec: 'h264_videotoolbox'  // macOS hardware encoder
+codec: 'h264_nvenc'  // NVIDIA hardware encoder
+```
+
+##### width
+
+> **width**: `number`
+
+Defined in: [VideoEncoder.ts:55](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L55)
+
+Frame width in pixels (must be > 0)
+
+##### height
+
+> **height**: `number`
+
+Defined in: [VideoEncoder.ts:60](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L60)
+
+Frame height in pixels (must be > 0)
+
+##### displayWidth?
+
+> `optional` **displayWidth**: `number`
+
+Defined in: [VideoEncoder.ts:66](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L66)
+
+Display width in pixels (defaults to width)
+Used for pixel aspect ratio correction
+
+##### displayHeight?
+
+> `optional` **displayHeight**: `number`
+
+Defined in: [VideoEncoder.ts:72](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L72)
+
+Display height in pixels (defaults to height)
+Used for pixel aspect ratio correction
+
+##### bitrate?
+
+> `optional` **bitrate**: `number`
+
+Defined in: [VideoEncoder.ts:82](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L82)
+
+Target bitrate in bits per second
+
+###### Example
+
+```ts
+bitrate: 1_000_000  // 1 Mbps
+bitrate: 5_000_000  // 5 Mbps
+```
+
+##### framerate?
+
+> `optional` **framerate**: `number`
+
+Defined in: [VideoEncoder.ts:88](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L88)
+
+Target framerate in frames per second
+
+###### Default
+
+```ts
+30
+```
+
+##### hardwareAcceleration?
+
+> `optional` **hardwareAcceleration**: `"no-preference"` \| `"prefer-hardware"` \| `"prefer-software"`
+
+Defined in: [VideoEncoder.ts:97](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L97)
+
+Hardware acceleration preference
+- `no-preference`: Let encoder decide
+- `prefer-hardware`: Use hardware encoder if available
+- `prefer-software`: Use software encoder
+
+###### Default
+
+```ts
+'no-preference'
+```
+
+##### alpha?
+
+> `optional` **alpha**: [`AlphaOption`](#alphaoption)
+
+Defined in: [VideoEncoder.ts:102](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L102)
+
+Alpha channel handling (if codec supports transparency)
+
+##### scalabilityMode?
+
+> `optional` **scalabilityMode**: `string`
+
+Defined in: [VideoEncoder.ts:108](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L108)
+
+Scalability mode for SVC/temporal layering
+
+###### Example
+
+```ts
+'L1T2' (1 spatial layer, 2 temporal layers)
+```
+
+##### bitrateMode?
+
+> `optional` **bitrateMode**: [`BitrateMode`](#bitratemode)
+
+Defined in: [VideoEncoder.ts:113](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L113)
+
+Bitrate control mode
+
+##### latencyMode?
+
+> `optional` **latencyMode**: [`LatencyMode`](#latencymode)
+
+Defined in: [VideoEncoder.ts:118](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L118)
+
+Encoding latency optimization
+
+##### colorSpace?
+
+> `optional` **colorSpace**: [`VideoColorSpaceInit`](VideoColorSpace.mdx#videocolorspaceinit)
+
+Defined in: [VideoEncoder.ts:123](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L123)
+
+Color space metadata (primaries, transfer, matrix)
+
+##### avc?
+
+> `optional` **avc**: `object`
+
+Defined in: [VideoEncoder.ts:128](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L128)
+
+H.264/AVC specific options
+
+###### format?
+
+> `optional` **format**: `"annexb"` \| `"avc"`
+
+Output format for H.264 bitstream
+- `annexb`: Annex B format (start codes)
+- `avc`: AVC format (length-prefixed NALUs)
+
+###### Default
+
+```ts
+'annexb'
+```
+
+##### useWorkerThread?
+
+> `optional` **useWorkerThread**: `boolean`
+
+Defined in: [VideoEncoder.ts:143](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L143)
+
+Use async (non-blocking) encoder via worker thread
+Set to false to use synchronous encoder (blocks event loop during encoding)
+
+###### Default
+
+```ts
+true
+```
+
+***
+
+### VideoEncoderInit
+
+Defined in: [VideoEncoder.ts:150](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L150)
+
+VideoEncoder initialization callbacks
+
+#### See
+
+https://w3c.github.io/webcodecs/#dictdef-videoencoderinit
+
+#### Properties
+
+##### output()
+
+> **output**: (`chunk`, `metadata?`) => `void`
+
+Defined in: [VideoEncoder.ts:156](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L156)
+
+Callback for encoded video chunks
+
+###### Parameters
+
+###### chunk
+
+[`EncodedVideoChunk`](EncodedVideoChunk.mdx#encodedvideochunk)
+
+Encoded video chunk (contains compressed data)
+
+###### metadata?
+
+[`VideoEncoderOutputMetadata`](#videoencoderoutputmetadata)
+
+Optional metadata (decoder config on first keyframe)
+
+###### Returns
+
+`void`
+
+##### error()
+
+> **error**: (`error`) => `void`
+
+Defined in: [VideoEncoder.ts:162](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L162)
+
+Callback for encoding errors
+
+###### Parameters
+
+###### error
+
+[`WebCodecsDOMException`](types.mdx#webcodecsdomexception)
+
+Error that occurred during encoding
+
+###### Returns
+
+`void`
+
+***
+
+### VideoEncoderOutputMetadata
+
+Defined in: [VideoEncoder.ts:169](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L169)
+
+Metadata returned with encoded chunks
+
+#### See
+
+https://w3c.github.io/webcodecs/#dictdef-encodedvideochunkmetadata
+
+#### Properties
+
+##### decoderConfig?
+
+> `optional` **decoderConfig**: `object`
+
+Defined in: [VideoEncoder.ts:174](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L174)
+
+Decoder configuration (sent with first keyframe)
+Contains codec parameters needed to initialize a VideoDecoder
+
+###### codec
+
+> **codec**: `string`
+
+Codec string (e.g., 'avc1.42E01E')
+
+###### codedWidth
+
+> **codedWidth**: `number`
+
+Frame width in pixels
+
+###### codedHeight
+
+> **codedHeight**: `number`
+
+Frame height in pixels
+
+###### description?
+
+> `optional` **description**: `ArrayBuffer`
+
+Codec-specific extradata (e.g., H.264 SPS/PPS, VP9 CodecPrivate)
+
+##### svc?
+
+> `optional` **svc**: `object`
+
+Defined in: [VideoEncoder.ts:188](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L188)
+
+Scalable Video Coding metadata (if using SVC)
+
+###### temporalLayerId
+
+> **temporalLayerId**: `number`
+
+Temporal layer ID (0 = base layer)
+
+***
+
+### VideoEncoderEncodeOptions
+
+Defined in: [VideoEncoder.ts:198](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L198)
+
+Options for encoding a single frame
+
+#### See
+
+https://w3c.github.io/webcodecs/#dictdef-videoencoderencodeoptions
+
+#### Properties
+
+##### keyFrame?
+
+> `optional` **keyFrame**: `boolean`
+
+Defined in: [VideoEncoder.ts:209](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L209)
+
+Force this frame to be a keyframe (I-frame)
+Keyframes are independently decodable (no dependencies on other frames)
+
+###### Default
+
+```ts
+false
+```
+
+###### Example
+
+```ts
+encoder.encode(frame, { keyFrame: true });  // Force keyframe
+encoder.encode(frame, { keyFrame: i % 60 === 0 });  // Keyframe every 2s at 30fps
+```
+
+***
+
+### VideoEncoderSupport
+
+Defined in: [VideoEncoder.ts:216](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L216)
+
+Result of codec support check
+
+#### See
+
+https://w3c.github.io/webcodecs/#dictdef-videoencodersupport
+
+#### Properties
+
+##### supported
+
+> **supported**: `boolean`
+
+Defined in: [VideoEncoder.ts:220](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L220)
+
+Whether the encoder configuration is supported
+
+##### config
+
+> **config**: [`VideoEncoderConfig`](#videoencoderconfig)
+
+Defined in: [VideoEncoder.ts:225](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L225)
+
+The configuration that was tested (may be modified/normalized)
+
+## Type Aliases
+
+### LatencyMode
+
+> **LatencyMode** = `"quality"` \| `"realtime"`
+
+Defined in: [VideoEncoder.ts:17](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L17)
+
+Encoder latency mode
+- `quality`: Optimize for compression ratio (slower)
+- `realtime`: Optimize for encoding speed (lower latency)
+
+***
+
+### BitrateMode
+
+> **BitrateMode** = `"constant"` \| `"variable"` \| `"quantizer"`
+
+Defined in: [VideoEncoder.ts:25](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L25)
+
+Bitrate control mode
+- `constant`: Constant bitrate (CBR)
+- `variable`: Variable bitrate (VBR)
+- `quantizer`: Constant quality (CQP)
+
+***
+
+### AlphaOption
+
+> **AlphaOption** = `"discard"` \| `"keep"`
+
+Defined in: [VideoEncoder.ts:32](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoEncoder.ts#L32)
+
+Alpha channel handling
+- `discard`: Remove alpha channel
+- `keep`: Preserve alpha channel (if codec supports it)

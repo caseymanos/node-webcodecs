@@ -1,0 +1,332 @@
+---
+title: "VideoDecoder"
+description: "Decode EncodedVideoChunk objects into VideoFrame for playback and processing"
+---
+
+# VideoDecoder
+
+## Classes
+
+### VideoDecoder
+
+Defined in: [VideoDecoder.ts:46](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L46)
+
+#### Constructors
+
+##### Constructor
+
+> **new VideoDecoder**(`init`): [`VideoDecoder`](#videodecoder)
+
+Defined in: [VideoDecoder.ts:92](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L92)
+
+###### Parameters
+
+###### init
+
+[`VideoDecoderInit`](#videodecoderinit)
+
+###### Returns
+
+[`VideoDecoder`](#videodecoder)
+
+#### Accessors
+
+##### state
+
+###### Get Signature
+
+> **get** **state**(): [`CodecState`](types.mdx#codecstate)
+
+Defined in: [VideoDecoder.ts:106](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L106)
+
+###### Returns
+
+[`CodecState`](types.mdx#codecstate)
+
+##### decodeQueueSize
+
+###### Get Signature
+
+> **get** **decodeQueueSize**(): `number`
+
+Defined in: [VideoDecoder.ts:110](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L110)
+
+###### Returns
+
+`number`
+
+#### Methods
+
+##### isConfigSupported()
+
+> `static` **isConfigSupported**(`config`): `Promise`\<[`VideoDecoderSupport`](#videodecodersupport)\>
+
+Defined in: [VideoDecoder.ts:57](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L57)
+
+###### Parameters
+
+###### config
+
+[`VideoDecoderConfig`](#videodecoderconfig)
+
+###### Returns
+
+`Promise`\<[`VideoDecoderSupport`](#videodecodersupport)\>
+
+##### addEventListener()
+
+> **addEventListener**(`type`, `listener`, `options?`): `void`
+
+Defined in: [VideoDecoder.ts:118](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L118)
+
+Minimal EventTarget-style API for 'dequeue' events.
+Enables compatibility with MediaBunny and browser WebCodecs code.
+
+###### Parameters
+
+###### type
+
+`string`
+
+###### listener
+
+() => `void`
+
+###### options?
+
+###### once?
+
+`boolean`
+
+###### Returns
+
+`void`
+
+##### removeEventListener()
+
+> **removeEventListener**(`type`, `listener`): `void`
+
+Defined in: [VideoDecoder.ts:137](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L137)
+
+###### Parameters
+
+###### type
+
+`string`
+
+###### listener
+
+() => `void`
+
+###### Returns
+
+`void`
+
+##### configure()
+
+> **configure**(`config`): `void`
+
+Defined in: [VideoDecoder.ts:163](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L163)
+
+###### Parameters
+
+###### config
+
+[`VideoDecoderConfig`](#videodecoderconfig)
+
+###### Returns
+
+`void`
+
+##### decode()
+
+> **decode**(`chunk`): `void`
+
+Defined in: [VideoDecoder.ts:231](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L231)
+
+###### Parameters
+
+###### chunk
+
+[`EncodedVideoChunk`](EncodedVideoChunk.mdx#encodedvideochunk)
+
+###### Returns
+
+`void`
+
+##### flush()
+
+> **flush**(): `Promise`\<`void`\>
+
+Defined in: [VideoDecoder.ts:248](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L248)
+
+###### Returns
+
+`Promise`\<`void`\>
+
+##### reset()
+
+> **reset**(): `void`
+
+Defined in: [VideoDecoder.ts:264](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L264)
+
+###### Returns
+
+`void`
+
+##### close()
+
+> **close**(): `void`
+
+Defined in: [VideoDecoder.ts:277](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L277)
+
+###### Returns
+
+`void`
+
+## Interfaces
+
+### VideoDecoderConfig
+
+Defined in: [VideoDecoder.ts:11](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L11)
+
+#### Properties
+
+##### codec
+
+> **codec**: `string`
+
+Defined in: [VideoDecoder.ts:12](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L12)
+
+##### codedWidth?
+
+> `optional` **codedWidth**: `number`
+
+Defined in: [VideoDecoder.ts:13](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L13)
+
+##### codedHeight?
+
+> `optional` **codedHeight**: `number`
+
+Defined in: [VideoDecoder.ts:14](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L14)
+
+##### displayAspectWidth?
+
+> `optional` **displayAspectWidth**: `number`
+
+Defined in: [VideoDecoder.ts:15](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L15)
+
+##### displayAspectHeight?
+
+> `optional` **displayAspectHeight**: `number`
+
+Defined in: [VideoDecoder.ts:16](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L16)
+
+##### colorSpace?
+
+> `optional` **colorSpace**: `object`
+
+Defined in: [VideoDecoder.ts:17](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L17)
+
+###### primaries?
+
+> `optional` **primaries**: `string`
+
+###### transfer?
+
+> `optional` **transfer**: `string`
+
+###### matrix?
+
+> `optional` **matrix**: `string`
+
+###### fullRange?
+
+> `optional` **fullRange**: `boolean`
+
+##### hardwareAcceleration?
+
+> `optional` **hardwareAcceleration**: `"no-preference"` \| `"prefer-hardware"` \| `"prefer-software"`
+
+Defined in: [VideoDecoder.ts:23](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L23)
+
+##### optimizeForLatency?
+
+> `optional` **optimizeForLatency**: `boolean`
+
+Defined in: [VideoDecoder.ts:24](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L24)
+
+##### description?
+
+> `optional` **description**: [`BufferSource`](types.mdx#buffersource)
+
+Defined in: [VideoDecoder.ts:25](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L25)
+
+##### useWorkerThread?
+
+> `optional` **useWorkerThread**: `boolean`
+
+Defined in: [VideoDecoder.ts:30](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L30)
+
+Use async (non-blocking) decoder. Defaults to true.
+Set to false to use synchronous decoder (blocks event loop during decoding).
+
+***
+
+### VideoDecoderInit
+
+Defined in: [VideoDecoder.ts:33](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L33)
+
+#### Properties
+
+##### output()
+
+> **output**: (`frame`) => `void`
+
+Defined in: [VideoDecoder.ts:34](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L34)
+
+###### Parameters
+
+###### frame
+
+[`VideoFrame`](VideoFrame.mdx#videoframe)
+
+###### Returns
+
+`void`
+
+##### error()
+
+> **error**: (`error`) => `void`
+
+Defined in: [VideoDecoder.ts:35](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L35)
+
+###### Parameters
+
+###### error
+
+[`WebCodecsDOMException`](types.mdx#webcodecsdomexception)
+
+###### Returns
+
+`void`
+
+***
+
+### VideoDecoderSupport
+
+Defined in: [VideoDecoder.ts:38](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L38)
+
+#### Properties
+
+##### supported
+
+> **supported**: `boolean`
+
+Defined in: [VideoDecoder.ts:39](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L39)
+
+##### config
+
+> **config**: [`VideoDecoderConfig`](#videodecoderconfig)
+
+Defined in: [VideoDecoder.ts:40](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L40)

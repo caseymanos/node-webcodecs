@@ -1,0 +1,378 @@
+---
+title: "Types"
+description: "TypeScript type definitions and common types used across the API"
+---
+
+# types
+
+## Classes
+
+### DOMRectReadOnly
+
+Defined in: [types.ts:9](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L9)
+
+#### Constructors
+
+##### Constructor
+
+> **new DOMRectReadOnly**(`x`, `y`, `width`, `height`): [`DOMRectReadOnly`](#domrectreadonly)
+
+Defined in: [types.ts:19](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L19)
+
+###### Parameters
+
+###### x
+
+`number` = `0`
+
+###### y
+
+`number` = `0`
+
+###### width
+
+`number` = `0`
+
+###### height
+
+`number` = `0`
+
+###### Returns
+
+[`DOMRectReadOnly`](#domrectreadonly)
+
+#### Properties
+
+##### x
+
+> `readonly` **x**: `number`
+
+Defined in: [types.ts:10](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L10)
+
+##### y
+
+> `readonly` **y**: `number`
+
+Defined in: [types.ts:11](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L11)
+
+##### width
+
+> `readonly` **width**: `number`
+
+Defined in: [types.ts:12](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L12)
+
+##### height
+
+> `readonly` **height**: `number`
+
+Defined in: [types.ts:13](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L13)
+
+##### top
+
+> `readonly` **top**: `number`
+
+Defined in: [types.ts:14](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L14)
+
+##### right
+
+> `readonly` **right**: `number`
+
+Defined in: [types.ts:15](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L15)
+
+##### bottom
+
+> `readonly` **bottom**: `number`
+
+Defined in: [types.ts:16](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L16)
+
+##### left
+
+> `readonly` **left**: `number`
+
+Defined in: [types.ts:17](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L17)
+
+#### Methods
+
+##### toJSON()
+
+> **toJSON**(): `object`
+
+Defined in: [types.ts:30](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L30)
+
+###### Returns
+
+`object`
+
+###### x
+
+> **x**: `number`
+
+###### y
+
+> **y**: `number`
+
+###### width
+
+> **width**: `number`
+
+###### height
+
+> **height**: `number`
+
+***
+
+### WebCodecsDOMException
+
+Defined in: [types.ts:36](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L36)
+
+#### Extends
+
+- `Error`
+
+#### Constructors
+
+##### Constructor
+
+> **new WebCodecsDOMException**(`message?`, `name?`): [`WebCodecsDOMException`](#webcodecsdomexception)
+
+Defined in: [types.ts:100](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L100)
+
+###### Parameters
+
+###### message?
+
+`string`
+
+###### name?
+
+`string`
+
+###### Returns
+
+[`WebCodecsDOMException`](#webcodecsdomexception)
+
+###### Overrides
+
+`Error.constructor`
+
+#### Properties
+
+##### name
+
+> `readonly` **name**: `string`
+
+Defined in: [types.ts:37](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L37)
+
+###### Overrides
+
+`Error.name`
+
+##### code
+
+> `readonly` **code**: `number`
+
+Defined in: [types.ts:38](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L38)
+
+##### INDEX\_SIZE\_ERR
+
+> `readonly` `static` **INDEX\_SIZE\_ERR**: `1` = `1`
+
+Defined in: [types.ts:40](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L40)
+
+##### DOMSTRING\_SIZE\_ERR
+
+> `readonly` `static` **DOMSTRING\_SIZE\_ERR**: `2` = `2`
+
+Defined in: [types.ts:41](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L41)
+
+##### HIERARCHY\_REQUEST\_ERR
+
+> `readonly` `static` **HIERARCHY\_REQUEST\_ERR**: `3` = `3`
+
+Defined in: [types.ts:42](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L42)
+
+##### WRONG\_DOCUMENT\_ERR
+
+> `readonly` `static` **WRONG\_DOCUMENT\_ERR**: `4` = `4`
+
+Defined in: [types.ts:43](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L43)
+
+##### INVALID\_CHARACTER\_ERR
+
+> `readonly` `static` **INVALID\_CHARACTER\_ERR**: `5` = `5`
+
+Defined in: [types.ts:44](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L44)
+
+##### NO\_DATA\_ALLOWED\_ERR
+
+> `readonly` `static` **NO\_DATA\_ALLOWED\_ERR**: `6` = `6`
+
+Defined in: [types.ts:45](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L45)
+
+##### NO\_MODIFICATION\_ALLOWED\_ERR
+
+> `readonly` `static` **NO\_MODIFICATION\_ALLOWED\_ERR**: `7` = `7`
+
+Defined in: [types.ts:46](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L46)
+
+##### NOT\_FOUND\_ERR
+
+> `readonly` `static` **NOT\_FOUND\_ERR**: `8` = `8`
+
+Defined in: [types.ts:47](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L47)
+
+##### NOT\_SUPPORTED\_ERR
+
+> `readonly` `static` **NOT\_SUPPORTED\_ERR**: `9` = `9`
+
+Defined in: [types.ts:48](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L48)
+
+##### INUSE\_ATTRIBUTE\_ERR
+
+> `readonly` `static` **INUSE\_ATTRIBUTE\_ERR**: `10` = `10`
+
+Defined in: [types.ts:49](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L49)
+
+##### INVALID\_STATE\_ERR
+
+> `readonly` `static` **INVALID\_STATE\_ERR**: `11` = `11`
+
+Defined in: [types.ts:50](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L50)
+
+##### SYNTAX\_ERR
+
+> `readonly` `static` **SYNTAX\_ERR**: `12` = `12`
+
+Defined in: [types.ts:51](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L51)
+
+##### INVALID\_MODIFICATION\_ERR
+
+> `readonly` `static` **INVALID\_MODIFICATION\_ERR**: `13` = `13`
+
+Defined in: [types.ts:52](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L52)
+
+##### NAMESPACE\_ERR
+
+> `readonly` `static` **NAMESPACE\_ERR**: `14` = `14`
+
+Defined in: [types.ts:53](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L53)
+
+##### INVALID\_ACCESS\_ERR
+
+> `readonly` `static` **INVALID\_ACCESS\_ERR**: `15` = `15`
+
+Defined in: [types.ts:54](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L54)
+
+##### VALIDATION\_ERR
+
+> `readonly` `static` **VALIDATION\_ERR**: `16` = `16`
+
+Defined in: [types.ts:55](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L55)
+
+##### TYPE\_MISMATCH\_ERR
+
+> `readonly` `static` **TYPE\_MISMATCH\_ERR**: `17` = `17`
+
+Defined in: [types.ts:56](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L56)
+
+##### SECURITY\_ERR
+
+> `readonly` `static` **SECURITY\_ERR**: `18` = `18`
+
+Defined in: [types.ts:57](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L57)
+
+##### NETWORK\_ERR
+
+> `readonly` `static` **NETWORK\_ERR**: `19` = `19`
+
+Defined in: [types.ts:58](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L58)
+
+##### ABORT\_ERR
+
+> `readonly` `static` **ABORT\_ERR**: `20` = `20`
+
+Defined in: [types.ts:59](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L59)
+
+##### URL\_MISMATCH\_ERR
+
+> `readonly` `static` **URL\_MISMATCH\_ERR**: `21` = `21`
+
+Defined in: [types.ts:60](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L60)
+
+##### QUOTA\_EXCEEDED\_ERR
+
+> `readonly` `static` **QUOTA\_EXCEEDED\_ERR**: `22` = `22`
+
+Defined in: [types.ts:61](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L61)
+
+##### TIMEOUT\_ERR
+
+> `readonly` `static` **TIMEOUT\_ERR**: `23` = `23`
+
+Defined in: [types.ts:62](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L62)
+
+##### INVALID\_NODE\_TYPE\_ERR
+
+> `readonly` `static` **INVALID\_NODE\_TYPE\_ERR**: `24` = `24`
+
+Defined in: [types.ts:63](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L63)
+
+##### DATA\_CLONE\_ERR
+
+> `readonly` `static` **DATA\_CLONE\_ERR**: `25` = `25`
+
+Defined in: [types.ts:64](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L64)
+
+## Type Aliases
+
+### BufferSource
+
+> **BufferSource** = `ArrayBuffer` \| `ArrayBufferView`
+
+Defined in: [types.ts:6](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L6)
+
+WebCodecs type definitions for Node.js
+
+***
+
+### WebCodecsError
+
+> **WebCodecsError** = [`WebCodecsDOMException`](#webcodecsdomexception)
+
+Defined in: [types.ts:110](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L110)
+
+***
+
+### CodecState
+
+> **CodecState** = `"unconfigured"` \| `"configured"` \| `"closed"`
+
+Defined in: [types.ts:120](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L120)
+
+## Functions
+
+### createDOMException()
+
+> **createDOMException**(`message?`, `name?`): [`WebCodecsDOMException`](#webcodecsdomexception)
+
+Defined in: [types.ts:112](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L112)
+
+#### Parameters
+
+##### message?
+
+`string`
+
+##### name?
+
+`string`
+
+#### Returns
+
+[`WebCodecsDOMException`](#webcodecsdomexception)
+
+## References
+
+### DOMException
+
+Renames and re-exports [WebCodecsDOMException](#webcodecsdomexception)

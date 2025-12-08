@@ -1,0 +1,237 @@
+---
+title: "Codec Registry"
+description: "Codec string parsing and FFmpeg codec mapping utilities"
+---
+
+# codec-registry
+
+## Interfaces
+
+### CodecInfo
+
+Defined in: [codec-registry.ts:5](https://github.com/caseymanos/node-webcodecs/blob/master/src/codec-registry.ts#L5)
+
+Codec Registry - Maps WebCodecs codec strings to FFmpeg codec IDs
+
+#### Properties
+
+##### ffmpegCodec
+
+> **ffmpegCodec**: `string`
+
+Defined in: [codec-registry.ts:6](https://github.com/caseymanos/node-webcodecs/blob/master/src/codec-registry.ts#L6)
+
+##### type
+
+> **type**: `"video"` \| `"audio"`
+
+Defined in: [codec-registry.ts:7](https://github.com/caseymanos/node-webcodecs/blob/master/src/codec-registry.ts#L7)
+
+##### profiles?
+
+> `optional` **profiles**: `Record`\<`string`, `number`\>
+
+Defined in: [codec-registry.ts:8](https://github.com/caseymanos/node-webcodecs/blob/master/src/codec-registry.ts#L8)
+
+## Variables
+
+### VIDEO\_CODECS
+
+> `const` **VIDEO\_CODECS**: `Record`\<`string`, [`CodecInfo`](#codecinfo)\>
+
+Defined in: [codec-registry.ts:64](https://github.com/caseymanos/node-webcodecs/blob/master/src/codec-registry.ts#L64)
+
+Video codec registry
+
+***
+
+### AUDIO\_CODECS
+
+> `const` **AUDIO\_CODECS**: `Record`\<`string`, [`CodecInfo`](#codecinfo)\>
+
+Defined in: [codec-registry.ts:109](https://github.com/caseymanos/node-webcodecs/blob/master/src/codec-registry.ts#L109)
+
+Audio codec registry
+
+## Functions
+
+### parseAvcCodecString()
+
+> **parseAvcCodecString**(`codec`): \{ `profile`: `number`; `level`: `number`; \} \| `null`
+
+Defined in: [codec-registry.ts:15](https://github.com/caseymanos/node-webcodecs/blob/master/src/codec-registry.ts#L15)
+
+Parse H.264/AVC codec string format: avc1.PPCCLL
+PP = profile_idc, CC = constraint_set flags, LL = level_idc
+
+#### Parameters
+
+##### codec
+
+`string`
+
+#### Returns
+
+\{ `profile`: `number`; `level`: `number`; \} \| `null`
+
+***
+
+### parseAacCodecString()
+
+> **parseAacCodecString**(`codec`): \{ `objectType`: `number`; \} \| `null`
+
+Defined in: [codec-registry.ts:29](https://github.com/caseymanos/node-webcodecs/blob/master/src/codec-registry.ts#L29)
+
+Parse AAC codec string format: mp4a.40.X
+X = audio object type (2 = AAC-LC, 5 = HE-AAC, 29 = HE-AACv2)
+
+#### Parameters
+
+##### codec
+
+`string`
+
+#### Returns
+
+\{ `objectType`: `number`; \} \| `null`
+
+***
+
+### parseVp9CodecString()
+
+> **parseVp9CodecString**(`codec`): \{ `profile`: `number`; `level`: `number`; `bitDepth`: `number`; \} \| `null`
+
+Defined in: [codec-registry.ts:40](https://github.com/caseymanos/node-webcodecs/blob/master/src/codec-registry.ts#L40)
+
+Parse VP9 codec string format: vp09.PP.LL.DD.CC.CP.TC.MC.FF
+PP = profile, LL = level, DD = bit depth, etc.
+
+#### Parameters
+
+##### codec
+
+`string`
+
+#### Returns
+
+\{ `profile`: `number`; `level`: `number`; `bitDepth`: `number`; \} \| `null`
+
+***
+
+### isVideoCodecSupported()
+
+> **isVideoCodecSupported**(`codec`): `boolean`
+
+Defined in: [codec-registry.ts:145](https://github.com/caseymanos/node-webcodecs/blob/master/src/codec-registry.ts#L145)
+
+Check if a video codec is supported
+
+#### Parameters
+
+##### codec
+
+`string`
+
+#### Returns
+
+`boolean`
+
+***
+
+### isAudioCodecSupported()
+
+> **isAudioCodecSupported**(`codec`): `boolean`
+
+Defined in: [codec-registry.ts:173](https://github.com/caseymanos/node-webcodecs/blob/master/src/codec-registry.ts#L173)
+
+Check if an audio codec is supported
+
+#### Parameters
+
+##### codec
+
+`string`
+
+#### Returns
+
+`boolean`
+
+***
+
+### getFFmpegVideoCodec()
+
+> **getFFmpegVideoCodec**(`codec`): `string` \| `null`
+
+Defined in: [codec-registry.ts:186](https://github.com/caseymanos/node-webcodecs/blob/master/src/codec-registry.ts#L186)
+
+Get the FFmpeg encoder name for a video codec string
+
+#### Parameters
+
+##### codec
+
+`string`
+
+#### Returns
+
+`string` \| `null`
+
+***
+
+### getFFmpegVideoDecoder()
+
+> **getFFmpegVideoDecoder**(`codec`): `string` \| `null`
+
+Defined in: [codec-registry.ts:210](https://github.com/caseymanos/node-webcodecs/blob/master/src/codec-registry.ts#L210)
+
+Get the FFmpeg decoder name for a video codec string
+
+#### Parameters
+
+##### codec
+
+`string`
+
+#### Returns
+
+`string` \| `null`
+
+***
+
+### getFFmpegAudioCodec()
+
+> **getFFmpegAudioCodec**(`codec`): `string` \| `null`
+
+Defined in: [codec-registry.ts:247](https://github.com/caseymanos/node-webcodecs/blob/master/src/codec-registry.ts#L247)
+
+Get the FFmpeg encoder name for an audio codec string
+
+#### Parameters
+
+##### codec
+
+`string`
+
+#### Returns
+
+`string` \| `null`
+
+***
+
+### getFFmpegAudioDecoder()
+
+> **getFFmpegAudioDecoder**(`codec`): `string` \| `null`
+
+Defined in: [codec-registry.ts:259](https://github.com/caseymanos/node-webcodecs/blob/master/src/codec-registry.ts#L259)
+
+Get the FFmpeg decoder name for an audio codec string
+
+#### Parameters
+
+##### codec
+
+`string`
+
+#### Returns
+
+`string` \| `null`

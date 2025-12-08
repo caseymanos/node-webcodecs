@@ -1,0 +1,228 @@
+---
+title: "AudioDecoder"
+description: "Decode EncodedAudioChunk objects into AudioData for playback and processing"
+---
+
+# AudioDecoder
+
+## Classes
+
+### AudioDecoder
+
+Defined in: [AudioDecoder.ts:31](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L31)
+
+#### Constructors
+
+##### Constructor
+
+> **new AudioDecoder**(`init`): [`AudioDecoder`](#audiodecoder)
+
+Defined in: [AudioDecoder.ts:44](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L44)
+
+###### Parameters
+
+###### init
+
+[`AudioDecoderInit`](#audiodecoderinit)
+
+###### Returns
+
+[`AudioDecoder`](#audiodecoder)
+
+#### Accessors
+
+##### state
+
+###### Get Signature
+
+> **get** **state**(): [`CodecState`](types.mdx#codecstate)
+
+Defined in: [AudioDecoder.ts:63](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L63)
+
+###### Returns
+
+[`CodecState`](types.mdx#codecstate)
+
+##### decodeQueueSize
+
+###### Get Signature
+
+> **get** **decodeQueueSize**(): `number`
+
+Defined in: [AudioDecoder.ts:67](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L67)
+
+###### Returns
+
+`number`
+
+#### Methods
+
+##### isConfigSupported()
+
+> `static` **isConfigSupported**(`config`): `Promise`\<[`AudioDecoderSupport`](#audiodecodersupport)\>
+
+Defined in: [AudioDecoder.ts:39](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L39)
+
+###### Parameters
+
+###### config
+
+[`AudioDecoderConfig`](#audiodecoderconfig)
+
+###### Returns
+
+`Promise`\<[`AudioDecoderSupport`](#audiodecodersupport)\>
+
+##### configure()
+
+> **configure**(`config`): `void`
+
+Defined in: [AudioDecoder.ts:71](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L71)
+
+###### Parameters
+
+###### config
+
+[`AudioDecoderConfig`](#audiodecoderconfig)
+
+###### Returns
+
+`void`
+
+##### decode()
+
+> **decode**(`chunk`): `void`
+
+Defined in: [AudioDecoder.ts:110](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L110)
+
+###### Parameters
+
+###### chunk
+
+[`EncodedAudioChunk`](EncodedAudioChunk.mdx#encodedaudiochunk)
+
+###### Returns
+
+`void`
+
+##### flush()
+
+> **flush**(): `Promise`\<`void`\>
+
+Defined in: [AudioDecoder.ts:127](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L127)
+
+###### Returns
+
+`Promise`\<`void`\>
+
+##### reset()
+
+> **reset**(): `void`
+
+Defined in: [AudioDecoder.ts:143](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L143)
+
+###### Returns
+
+`void`
+
+##### close()
+
+> **close**(): `void`
+
+Defined in: [AudioDecoder.ts:156](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L156)
+
+###### Returns
+
+`void`
+
+## Interfaces
+
+### AudioDecoderConfig
+
+Defined in: [AudioDecoder.ts:11](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L11)
+
+#### Properties
+
+##### codec
+
+> **codec**: `string`
+
+Defined in: [AudioDecoder.ts:12](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L12)
+
+##### sampleRate
+
+> **sampleRate**: `number`
+
+Defined in: [AudioDecoder.ts:13](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L13)
+
+##### numberOfChannels
+
+> **numberOfChannels**: `number`
+
+Defined in: [AudioDecoder.ts:14](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L14)
+
+##### description?
+
+> `optional` **description**: [`BufferSource`](types.mdx#buffersource)
+
+Defined in: [AudioDecoder.ts:15](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L15)
+
+***
+
+### AudioDecoderInit
+
+Defined in: [AudioDecoder.ts:18](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L18)
+
+#### Properties
+
+##### output()
+
+> **output**: (`data`) => `void`
+
+Defined in: [AudioDecoder.ts:19](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L19)
+
+###### Parameters
+
+###### data
+
+[`AudioData`](AudioData.mdx#audiodata)
+
+###### Returns
+
+`void`
+
+##### error()
+
+> **error**: (`error`) => `void`
+
+Defined in: [AudioDecoder.ts:20](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L20)
+
+###### Parameters
+
+###### error
+
+[`WebCodecsDOMException`](types.mdx#webcodecsdomexception)
+
+###### Returns
+
+`void`
+
+***
+
+### AudioDecoderSupport
+
+Defined in: [AudioDecoder.ts:23](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L23)
+
+#### Properties
+
+##### supported
+
+> **supported**: `boolean`
+
+Defined in: [AudioDecoder.ts:24](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L24)
+
+##### config
+
+> **config**: [`AudioDecoderConfig`](#audiodecoderconfig)
+
+Defined in: [AudioDecoder.ts:25](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L25)

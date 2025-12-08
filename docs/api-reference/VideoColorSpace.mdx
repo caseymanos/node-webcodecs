@@ -1,0 +1,127 @@
+---
+title: "VideoColorSpace"
+description: "Describes video color space including primaries, transfer, and matrix"
+---
+
+# VideoColorSpace
+
+## Classes
+
+### VideoColorSpace
+
+Defined in: [VideoColorSpace.ts:35](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L35)
+
+#### Constructors
+
+##### Constructor
+
+> **new VideoColorSpace**(`init?`): [`VideoColorSpace`](#videocolorspace)
+
+Defined in: [VideoColorSpace.ts:41](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L41)
+
+###### Parameters
+
+###### init?
+
+[`VideoColorSpaceInit`](#videocolorspaceinit)
+
+###### Returns
+
+[`VideoColorSpace`](#videocolorspace)
+
+#### Properties
+
+##### primaries
+
+> `readonly` **primaries**: [`VideoColorPrimaries`](#videocolorprimaries) \| `null`
+
+Defined in: [VideoColorSpace.ts:36](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L36)
+
+##### transfer
+
+> `readonly` **transfer**: [`VideoTransferCharacteristics`](#videotransfercharacteristics) \| `null`
+
+Defined in: [VideoColorSpace.ts:37](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L37)
+
+##### matrix
+
+> `readonly` **matrix**: [`VideoMatrixCoefficients`](#videomatrixcoefficients) \| `null`
+
+Defined in: [VideoColorSpace.ts:38](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L38)
+
+##### fullRange
+
+> `readonly` **fullRange**: `boolean` \| `null`
+
+Defined in: [VideoColorSpace.ts:39](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L39)
+
+#### Methods
+
+##### toJSON()
+
+> **toJSON**(): [`VideoColorSpaceInit`](#videocolorspaceinit)
+
+Defined in: [VideoColorSpace.ts:48](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L48)
+
+###### Returns
+
+[`VideoColorSpaceInit`](#videocolorspaceinit)
+
+## Interfaces
+
+### VideoColorSpaceInit
+
+Defined in: [VideoColorSpace.ts:28](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L28)
+
+#### Properties
+
+##### primaries?
+
+> `optional` **primaries**: [`VideoColorPrimaries`](#videocolorprimaries) \| `null`
+
+Defined in: [VideoColorSpace.ts:29](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L29)
+
+##### transfer?
+
+> `optional` **transfer**: [`VideoTransferCharacteristics`](#videotransfercharacteristics) \| `null`
+
+Defined in: [VideoColorSpace.ts:30](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L30)
+
+##### matrix?
+
+> `optional` **matrix**: [`VideoMatrixCoefficients`](#videomatrixcoefficients) \| `null`
+
+Defined in: [VideoColorSpace.ts:31](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L31)
+
+##### fullRange?
+
+> `optional` **fullRange**: `boolean` \| `null`
+
+Defined in: [VideoColorSpace.ts:32](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L32)
+
+## Type Aliases
+
+### VideoColorPrimaries
+
+> **VideoColorPrimaries** = `"bt709"` \| `"bt470bg"` \| `"smpte170m"` \| `"bt2020"` \| `"smpte432"`
+
+Defined in: [VideoColorSpace.ts:6](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L6)
+
+VideoColorSpace - Describes the color space of a video frame
+Implements the W3C WebCodecs VideoColorSpace interface
+
+***
+
+### VideoTransferCharacteristics
+
+> **VideoTransferCharacteristics** = `"bt709"` \| `"smpte170m"` \| `"iec61966-2-1"` \| `"linear"` \| `"pq"` \| `"hlg"`
+
+Defined in: [VideoColorSpace.ts:13](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L13)
+
+***
+
+### VideoMatrixCoefficients
+
+> **VideoMatrixCoefficients** = `"rgb"` \| `"bt709"` \| `"bt470bg"` \| `"smpte170m"` \| `"bt2020-ncl"`
+
+Defined in: [VideoColorSpace.ts:21](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L21)

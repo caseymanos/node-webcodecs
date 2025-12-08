@@ -1,0 +1,218 @@
+---
+title: "AudioData"
+description: "Represents audio sample data with format and timestamp metadata"
+---
+
+# AudioData
+
+## Classes
+
+### AudioData
+
+Defined in: [AudioData.ts:65](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L65)
+
+#### Constructors
+
+##### Constructor
+
+> **new AudioData**(`init`): [`AudioData`](#audiodata)
+
+Defined in: [AudioData.ts:77](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L77)
+
+###### Parameters
+
+###### init
+
+[`AudioDataInit`](#audiodatainit)
+
+###### Returns
+
+[`AudioData`](#audiodata)
+
+#### Properties
+
+##### format
+
+> `readonly` **format**: [`AudioSampleFormat`](#audiosampleformat) \| `null`
+
+Defined in: [AudioData.ts:70](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L70)
+
+##### sampleRate
+
+> `readonly` **sampleRate**: `number`
+
+Defined in: [AudioData.ts:71](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L71)
+
+##### numberOfFrames
+
+> `readonly` **numberOfFrames**: `number`
+
+Defined in: [AudioData.ts:72](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L72)
+
+##### numberOfChannels
+
+> `readonly` **numberOfChannels**: `number`
+
+Defined in: [AudioData.ts:73](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L73)
+
+##### duration
+
+> `readonly` **duration**: `number`
+
+Defined in: [AudioData.ts:74](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L74)
+
+##### timestamp
+
+> `readonly` **timestamp**: `number`
+
+Defined in: [AudioData.ts:75](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L75)
+
+#### Methods
+
+##### allocationSize()
+
+> **allocationSize**(`options`): `number`
+
+Defined in: [AudioData.ts:140](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L140)
+
+Calculate the size in bytes needed to hold the audio data for a plane
+
+###### Parameters
+
+###### options
+
+[`AudioDataCopyToOptions`](#audiodatacopytooptions)
+
+###### Returns
+
+`number`
+
+##### copyTo()
+
+> **copyTo**(`destination`, `options`): `void`
+
+Defined in: [AudioData.ts:165](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L165)
+
+Copy audio data to a destination buffer
+
+###### Parameters
+
+###### destination
+
+[`BufferSource`](types.mdx#buffersource)
+
+###### options
+
+[`AudioDataCopyToOptions`](#audiodatacopytooptions)
+
+###### Returns
+
+`void`
+
+##### clone()
+
+> **clone**(): [`AudioData`](#audiodata)
+
+Defined in: [AudioData.ts:223](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L223)
+
+Create a clone of this audio data
+
+###### Returns
+
+[`AudioData`](#audiodata)
+
+##### close()
+
+> **close**(): `void`
+
+Defined in: [AudioData.ts:243](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L243)
+
+Close the audio data and release resources
+
+###### Returns
+
+`void`
+
+## Interfaces
+
+### AudioDataInit
+
+Defined in: [AudioData.ts:18](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L18)
+
+#### Properties
+
+##### format
+
+> **format**: [`AudioSampleFormat`](#audiosampleformat)
+
+Defined in: [AudioData.ts:19](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L19)
+
+##### sampleRate
+
+> **sampleRate**: `number`
+
+Defined in: [AudioData.ts:20](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L20)
+
+##### numberOfFrames
+
+> **numberOfFrames**: `number`
+
+Defined in: [AudioData.ts:21](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L21)
+
+##### numberOfChannels
+
+> **numberOfChannels**: `number`
+
+Defined in: [AudioData.ts:22](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L22)
+
+##### timestamp
+
+> **timestamp**: `number`
+
+Defined in: [AudioData.ts:23](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L23)
+
+##### data
+
+> **data**: [`BufferSource`](types.mdx#buffersource)
+
+Defined in: [AudioData.ts:24](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L24)
+
+***
+
+### AudioDataCopyToOptions
+
+Defined in: [AudioData.ts:27](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L27)
+
+#### Properties
+
+##### planeIndex
+
+> **planeIndex**: `number`
+
+Defined in: [AudioData.ts:28](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L28)
+
+##### frameOffset?
+
+> `optional` **frameOffset**: `number`
+
+Defined in: [AudioData.ts:29](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L29)
+
+##### frameCount?
+
+> `optional` **frameCount**: `number`
+
+Defined in: [AudioData.ts:30](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L30)
+
+##### format?
+
+> `optional` **format**: [`AudioSampleFormat`](#audiosampleformat)
+
+Defined in: [AudioData.ts:31](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L31)
+
+## Type Aliases
+
+### AudioSampleFormat
+
+> **AudioSampleFormat** = `"u8"` \| `"s16"` \| `"s32"` \| `"f32"` \| `"u8-planar"` \| `"s16-planar"` \| `"s32-planar"` \| `"f32-planar"`
+
+Defined in: [AudioData.ts:8](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L8)
