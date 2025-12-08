@@ -1,0 +1,116 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "node-webcodecs",
+  "colors": {
+    "primary": "#00ffc8",
+    "light": "#4dabf7",
+    "dark": "#00ffc8"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Getting Started",
+        "pages": [
+          "introduction",
+          "getting-started/installation",
+          "getting-started/quick-start",
+          "getting-started/first-decode"
+        ]
+      },
+      {
+        "group": "Migration Guides",
+        "pages": [
+          "migration/from-ffmpeg-cli",
+          "migration/from-browser"
+        ]
+      },
+      {
+        "group": "API Reference",
+        "pages": [
+          "api-reference/index",
+          "api-reference/VideoEncoder",
+          "api-reference/VideoDecoder",
+          "api-reference/VideoFrame",
+          "api-reference/AudioEncoder",
+          "api-reference/AudioDecoder",
+          "api-reference/AudioData",
+          "api-reference/ImageDecoder",
+          "api-reference/EncodedVideoChunk",
+          "api-reference/EncodedAudioChunk",
+          "api-reference/VideoColorSpace",
+          "api-reference/types"
+        ]
+      },
+      {
+        "group": "Guides",
+        "pages": [
+          "guides/hardware-acceleration",
+          "guides/hdr-encoding",
+          "guides/alpha-channels",
+          "guides/worker-threads",
+          "guides/backpressure"
+        ]
+      },
+      {
+        "group": "Cookbook",
+        "pages": [
+          "cookbook/overview",
+          "cookbook/transcode",
+          "cookbook/watermark",
+          "cookbook/thumbnails",
+          "cookbook/webrtc-recording",
+          "cookbook/video-validation"
+        ]
+      },
+      {
+        "group": "Examples",
+        "pages": [
+          "examples/basic-encoding",
+          "examples/hdr-encoding",
+          "examples/alpha-video",
+          "examples/real-world"
+        ]
+      },
+      {
+        "group": "Help",
+        "pages": [
+          "troubleshooting/overview"
+        ]
+      }
+    ]
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "GitHub",
+        "href": "https://github.com/caseymanos/node-webcodecs"
+      },
+      {
+        "label": "npm",
+        "href": "https://www.npmjs.com/package/node-webcodecs"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Install",
+      "href": "https://www.npmjs.com/package/node-webcodecs"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/caseymanos/node-webcodecs",
+      "twitter": "https://twitter.com/caseymanos"
+    }
+  },
+  "integrations": {
+    "posthog": {
+      "apiKey": "phc_your_key_here"
+    }
+  }
+}
