@@ -1,0 +1,1316 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>node-webcodecs — WebCodecs API for Node.js</title>
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap"
+            rel="stylesheet"
+        />
+        <style>
+            :root {
+                --bg-deep: #0a0a0b;
+                --bg-surface: #111113;
+                --bg-elevated: #1a1a1d;
+                --border: #2a2a2e;
+                --text-primary: #fafafa;
+                --text-secondary: #888890;
+                --text-tertiary: #555560;
+                --accent: #00ffc8;
+                --accent-dim: #00ffc820;
+                --accent-glow: #00ffc840;
+                --frame-orange: #ff6b35;
+                --frame-blue: #4dabf7;
+                --frame-purple: #da77f2;
+                --code-bg: #0d0d0f;
+            }
+
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            html {
+                scroll-behavior: smooth;
+            }
+
+            body {
+                font-family: "JetBrains Mono", monospace;
+                background: var(--bg-deep);
+                color: var(--text-primary);
+                line-height: 1.6;
+                overflow-x: hidden;
+            }
+
+            .serif {
+                font-family: "Instrument Serif", serif;
+            }
+
+            /* Grain overlay */
+            body::before {
+                content: "";
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+                opacity: 0.03;
+                pointer-events: none;
+                z-index: 1000;
+            }
+
+            /* Scanlines */
+            body::after {
+                content: "";
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(0, 0, 0, 0.1) 2px,
+                    rgba(0, 0, 0, 0.1) 4px
+                );
+                pointer-events: none;
+                z-index: 999;
+            }
+
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 0 24px;
+            }
+
+            /* Navigation */
+            nav {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                z-index: 100;
+                padding: 20px 0;
+                background: linear-gradient(
+                    to bottom,
+                    var(--bg-deep),
+                    transparent
+                );
+                backdrop-filter: blur(8px);
+            }
+
+            nav .container {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            .logo {
+                font-size: 14px;
+                font-weight: 600;
+                letter-spacing: -0.02em;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+
+            .logo-icon {
+                width: 28px;
+                height: 28px;
+                border: 2px solid var(--accent);
+                position: relative;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .logo-icon::before {
+                content: "▶";
+                font-size: 10px;
+                color: var(--accent);
+            }
+
+            .nav-links {
+                display: flex;
+                gap: 32px;
+                list-style: none;
+            }
+
+            .nav-links a {
+                color: var(--text-secondary);
+                text-decoration: none;
+                font-size: 12px;
+                text-transform: uppercase;
+                letter-spacing: 0.1em;
+                transition: color 0.2s;
+            }
+
+            .nav-links a:hover {
+                color: var(--accent);
+            }
+
+            /* Hero */
+            .hero {
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                padding: 120px 0 80px;
+                position: relative;
+            }
+
+            .hero-grid {
+                position: absolute;
+                inset: 0;
+                background-image:
+                    linear-gradient(var(--border) 1px, transparent 1px),
+                    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+                background-size: 60px 60px;
+                opacity: 0.3;
+                mask-image: radial-gradient(
+                    ellipse at center,
+                    black 0%,
+                    transparent 70%
+                );
+            }
+
+            .hero-content {
+                position: relative;
+                z-index: 1;
+            }
+
+            .hero-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                padding: 8px 16px;
+                background: var(--bg-elevated);
+                border: 1px solid var(--border);
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: 0.15em;
+                color: var(--text-secondary);
+                margin-bottom: 32px;
+                animation: fadeInUp 0.8s ease;
+            }
+
+            .hero-badge::before {
+                content: "";
+                width: 6px;
+                height: 6px;
+                background: var(--accent);
+                border-radius: 50%;
+                animation: pulse 2s infinite;
+            }
+
+            @keyframes pulse {
+                0%,
+                100% {
+                    opacity: 1;
+                }
+                50% {
+                    opacity: 0.4;
+                }
+            }
+
+            .hero h1 {
+                font-family: "Instrument Serif", serif;
+                font-size: clamp(48px, 10vw, 120px);
+                font-weight: 400;
+                line-height: 0.95;
+                letter-spacing: -0.03em;
+                margin-bottom: 24px;
+                animation: fadeInUp 0.8s ease 0.1s both;
+            }
+
+            .hero h1 span {
+                color: var(--accent);
+                font-style: italic;
+            }
+
+            .hero-subtitle {
+                font-size: 16px;
+                color: var(--text-secondary);
+                max-width: 500px;
+                margin-bottom: 48px;
+                animation: fadeInUp 0.8s ease 0.2s both;
+            }
+
+            .hero-actions {
+                display: flex;
+                gap: 16px;
+                flex-wrap: wrap;
+                animation: fadeInUp 0.8s ease 0.3s both;
+            }
+
+            .install-cmd {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 16px 24px;
+                background: var(--code-bg);
+                border: 1px solid var(--border);
+                font-size: 14px;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+
+            .install-cmd:hover {
+                border-color: var(--accent);
+                box-shadow: 0 0 20px var(--accent-dim);
+            }
+
+            .install-cmd .prompt {
+                color: var(--accent);
+            }
+
+            .install-cmd .copy {
+                color: var(--text-tertiary);
+                font-size: 10px;
+                text-transform: uppercase;
+                letter-spacing: 0.1em;
+                margin-left: auto;
+            }
+
+            .btn-primary {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                padding: 16px 32px;
+                background: var(--accent);
+                color: var(--bg-deep);
+                text-decoration: none;
+                font-size: 12px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.1em;
+                transition: all 0.2s;
+            }
+
+            .btn-primary:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 8px 30px var(--accent-glow);
+            }
+
+            @keyframes fadeInUp {
+                from {
+                    opacity: 0;
+                    transform: translateY(20px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            /* Frame visualization */
+            .hero-visual {
+                position: absolute;
+                right: 5%;
+                top: 50%;
+                transform: translateY(-50%);
+                width: 400px;
+                height: 300px;
+                opacity: 0.8;
+            }
+
+            .frame {
+                position: absolute;
+                border: 2px solid;
+                background: linear-gradient(
+                    135deg,
+                    transparent 40%,
+                    currentColor 40%,
+                    currentColor 41%,
+                    transparent 41%
+                );
+                opacity: 0.6;
+            }
+
+            .frame-1 {
+                width: 200px;
+                height: 150px;
+                color: var(--frame-orange);
+                top: 0;
+                right: 0;
+                animation: float 6s ease-in-out infinite;
+            }
+
+            .frame-2 {
+                width: 180px;
+                height: 135px;
+                color: var(--frame-blue);
+                top: 40px;
+                right: 60px;
+                animation: float 6s ease-in-out infinite 1s;
+            }
+
+            .frame-3 {
+                width: 160px;
+                height: 120px;
+                color: var(--frame-purple);
+                top: 80px;
+                right: 120px;
+                animation: float 6s ease-in-out infinite 2s;
+            }
+
+            @keyframes float {
+                0%,
+                100% {
+                    transform: translateY(0) rotate(0deg);
+                }
+                50% {
+                    transform: translateY(-10px) rotate(1deg);
+                }
+            }
+
+            /* The Problem Section */
+            .problem {
+                padding: 120px 0;
+                border-top: 1px solid var(--border);
+            }
+
+            .section-label {
+                font-size: 10px;
+                text-transform: uppercase;
+                letter-spacing: 0.2em;
+                color: var(--accent);
+                margin-bottom: 16px;
+            }
+
+            .problem h2 {
+                font-family: "Instrument Serif", serif;
+                font-size: clamp(32px, 5vw, 48px);
+                font-weight: 400;
+                margin-bottom: 64px;
+                max-width: 700px;
+            }
+
+            .comparison {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 24px;
+            }
+
+            @media (max-width: 768px) {
+                .comparison {
+                    grid-template-columns: 1fr;
+                }
+            }
+
+            .comparison-card {
+                background: var(--bg-surface);
+                border: 1px solid var(--border);
+                padding: 32px;
+                position: relative;
+                overflow: hidden;
+            }
+
+            .comparison-card.bad {
+                opacity: 0.7;
+            }
+
+            .comparison-card.good {
+                border-color: var(--accent);
+                box-shadow: 0 0 40px var(--accent-dim);
+            }
+
+            .comparison-card h3 {
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: 0.15em;
+                color: var(--text-secondary);
+                margin-bottom: 24px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .comparison-card.bad h3::before {
+                content: "✕";
+                color: #ff6b6b;
+            }
+
+            .comparison-card.good h3::before {
+                content: "✓";
+                color: var(--accent);
+            }
+
+            .code-block {
+                background: var(--code-bg);
+                padding: 20px;
+                font-size: 12px;
+                line-height: 1.7;
+                overflow-x: auto;
+                border: 1px solid var(--border);
+            }
+
+            .code-block .comment {
+                color: var(--text-tertiary);
+            }
+
+            .code-block .keyword {
+                color: var(--frame-purple);
+            }
+
+            .code-block .string {
+                color: var(--accent);
+            }
+
+            .code-block .function {
+                color: var(--frame-blue);
+            }
+
+            /* Use Cases */
+            .usecases {
+                padding: 120px 0;
+                border-top: 1px solid var(--border);
+            }
+
+            .usecases h2 {
+                font-family: "Instrument Serif", serif;
+                font-size: clamp(32px, 5vw, 48px);
+                font-weight: 400;
+                margin-bottom: 16px;
+            }
+
+            .usecases-intro {
+                color: var(--text-secondary);
+                font-size: 14px;
+                max-width: 600px;
+                margin-bottom: 80px;
+            }
+
+            .usecase {
+                display: grid;
+                grid-template-columns: 1fr 1.2fr;
+                gap: 64px;
+                padding: 80px 0;
+                border-top: 1px solid var(--border);
+                align-items: center;
+            }
+
+            .usecase:nth-child(even) {
+                direction: rtl;
+            }
+
+            .usecase:nth-child(even) > * {
+                direction: ltr;
+            }
+
+            @media (max-width: 900px) {
+                .usecase,
+                .usecase:nth-child(even) {
+                    grid-template-columns: 1fr;
+                    direction: ltr;
+                }
+            }
+
+            .usecase-number {
+                font-family: "Instrument Serif", serif;
+                font-size: 72px;
+                color: var(--border);
+                line-height: 1;
+                margin-bottom: 16px;
+            }
+
+            .usecase-title {
+                font-size: 24px;
+                font-weight: 500;
+                margin-bottom: 16px;
+                letter-spacing: -0.02em;
+            }
+
+            .usecase-who {
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: 0.15em;
+                color: var(--accent);
+                margin-bottom: 16px;
+            }
+
+            .usecase-description {
+                color: var(--text-secondary);
+                font-size: 14px;
+                margin-bottom: 24px;
+            }
+
+            .usecase-benefit {
+                display: flex;
+                align-items: flex-start;
+                gap: 12px;
+                padding: 16px;
+                background: var(--bg-elevated);
+                border-left: 2px solid var(--accent);
+                font-size: 13px;
+            }
+
+            .usecase-benefit::before {
+                content: "→";
+                color: var(--accent);
+            }
+
+            /* Features Grid */
+            .features {
+                padding: 120px 0;
+                border-top: 1px solid var(--border);
+            }
+
+            .features h2 {
+                font-family: "Instrument Serif", serif;
+                font-size: clamp(32px, 5vw, 48px);
+                font-weight: 400;
+                margin-bottom: 64px;
+            }
+
+            .features-grid {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 1px;
+                background: var(--border);
+                border: 1px solid var(--border);
+            }
+
+            @media (max-width: 768px) {
+                .features-grid {
+                    grid-template-columns: 1fr;
+                }
+            }
+
+            .feature {
+                background: var(--bg-surface);
+                padding: 40px;
+                transition: all 0.3s;
+            }
+
+            .feature:hover {
+                background: var(--bg-elevated);
+            }
+
+            .feature-icon {
+                width: 48px;
+                height: 48px;
+                border: 1px solid var(--border);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-bottom: 24px;
+                font-size: 20px;
+            }
+
+            .feature h3 {
+                font-size: 14px;
+                font-weight: 600;
+                margin-bottom: 12px;
+                letter-spacing: -0.01em;
+            }
+
+            .feature p {
+                font-size: 13px;
+                color: var(--text-secondary);
+                line-height: 1.6;
+            }
+
+            /* CTA */
+            .cta {
+                padding: 120px 0;
+                border-top: 1px solid var(--border);
+                text-align: center;
+            }
+
+            .cta h2 {
+                font-family: "Instrument Serif", serif;
+                font-size: clamp(36px, 6vw, 64px);
+                font-weight: 400;
+                margin-bottom: 24px;
+            }
+
+            .cta h2 span {
+                font-style: italic;
+                color: var(--accent);
+            }
+
+            .cta p {
+                color: var(--text-secondary);
+                font-size: 14px;
+                margin-bottom: 48px;
+            }
+
+            .cta-actions {
+                display: flex;
+                justify-content: center;
+                gap: 16px;
+                flex-wrap: wrap;
+            }
+
+            .btn-secondary {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                padding: 16px 32px;
+                background: transparent;
+                border: 1px solid var(--border);
+                color: var(--text-primary);
+                text-decoration: none;
+                font-size: 12px;
+                font-weight: 500;
+                text-transform: uppercase;
+                letter-spacing: 0.1em;
+                transition: all 0.2s;
+            }
+
+            .btn-secondary:hover {
+                border-color: var(--text-primary);
+                background: var(--bg-elevated);
+            }
+
+            /* Footer */
+            footer {
+                padding: 40px 0;
+                border-top: 1px solid var(--border);
+            }
+
+            footer .container {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            footer p {
+                font-size: 11px;
+                color: var(--text-tertiary);
+            }
+
+            footer a {
+                color: var(--text-secondary);
+                text-decoration: none;
+                font-size: 11px;
+                transition: color 0.2s;
+            }
+
+            footer a:hover {
+                color: var(--accent);
+            }
+
+            /* Runtime Badges */
+            .runtime-badges {
+                display: flex;
+                gap: 12px;
+                margin-bottom: 24px;
+            }
+
+            .runtime-badge {
+                padding: 6px 12px;
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: 0.1em;
+                border: 1px solid var(--border);
+                background: var(--bg-elevated);
+            }
+
+            .runtime-badge.bun {
+                border-color: #fbf0df;
+                color: #fbf0df;
+            }
+
+            .runtime-badge.node {
+                border-color: #5fa04e;
+                color: #5fa04e;
+            }
+
+            /* Scrollbar */
+            ::-webkit-scrollbar {
+                width: 8px;
+            }
+
+            ::-webkit-scrollbar-track {
+                background: var(--bg-deep);
+            }
+
+            ::-webkit-scrollbar-thumb {
+                background: var(--border);
+            }
+
+            ::-webkit-scrollbar-thumb:hover {
+                background: var(--text-tertiary);
+            }
+        </style>
+    </head>
+    <body>
+        <nav>
+            <div class="container">
+                <div class="logo">
+                    <div class="logo-icon"></div>
+                    node-webcodecs
+                </div>
+                <ul class="nav-links">
+                    <li><a href="#usecases">Use Cases</a></li>
+                    <li><a href="#features">Features</a></li>
+                    <li>
+                        <a href="https://github.com/caseymanos/node-webcodecs"
+                            >GitHub</a
+                        >
+                    </li>
+                    <li>
+                        <a href="https://www.npmjs.com/package/node-webcodecs"
+                            >npm</a
+                        >
+                    </li>
+                </ul>
+            </div>
+        </nav>
+
+        <section class="hero">
+            <div class="hero-grid"></div>
+            <div class="hero-visual">
+                <div class="frame frame-1"></div>
+                <div class="frame frame-2"></div>
+                <div class="frame frame-3"></div>
+            </div>
+            <div class="container">
+                <div class="hero-content">
+                    <div class="hero-badge">Now Available on npm</div>
+                    <div class="runtime-badges">
+                        <span class="runtime-badge node">Node.js 18+</span>
+                        <span class="runtime-badge bun">Bun 1.0+</span>
+                    </div>
+                    <h1>WebCodecs<br />for <span>Node.js</span></h1>
+                    <p class="hero-subtitle">
+                        Frame-level video encoding and decoding. No FFmpeg CLI.
+                        No subprocess overhead. Just TypeScript.
+                    </p>
+                    <div class="hero-actions">
+                        <div
+                            class="install-cmd"
+                            onclick="
+                                navigator.clipboard.writeText(
+                                    'npm install node-webcodecs',
+                                )
+                            "
+                        >
+                            <span class="prompt">$</span>
+                            <span>npm install node-webcodecs</span>
+                            <span class="copy">copy</span>
+                        </div>
+                        <div
+                            class="install-cmd"
+                            onclick="
+                                navigator.clipboard.writeText(
+                                    'bun add node-webcodecs',
+                                )
+                            "
+                        >
+                            <span class="prompt">$</span>
+                            <span>bun add node-webcodecs</span>
+                            <span class="copy">copy</span>
+                        </div>
+                        <a
+                            href="https://docs.node-webcodecs.com"
+                            class="btn-primary"
+                        >
+                            Documentation →
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="problem">
+            <div class="container">
+                <div class="section-label">The Problem</div>
+                <h2>
+                    Server-side video in Node has been stuck in the FFmpeg era
+                </h2>
+                <div class="comparison">
+                    <div class="comparison-card bad">
+                        <h3>FFmpeg filter_complex</h3>
+                        <div class="code-block">
+                            <span class="comment"
+                                >// Dynamic text overlay with position
+                                animation</span
+                            ><br />
+                            ffmpeg -i bg.mp4 -i overlay.png \<br />
+                            &nbsp;&nbsp;-filter_complex \<br />
+                            &nbsp;&nbsp;<span class="string"
+                                >"[0:v][1:v]overlay=x='if(lt(t,5),10,100)'</span
+                            ><br />
+                            &nbsp;&nbsp;<span class="string"
+                                >:y=10[v1];[v1]drawtext=text='Hello':</span
+                            ><br />
+                            &nbsp;&nbsp;<span class="string"
+                                >fontsize=24:x=100:y=100:</span
+                            ><br />
+                            &nbsp;&nbsp;<span class="string"
+                                >enable='between(t,2,8)'[v2]"</span
+                            >
+                            \<br />
+                            &nbsp;&nbsp;-map
+                            <span class="string">"[v2]"</span>
+                            output.mp4<br /><br />
+                            <span class="comment"
+                                >// Good luck debugging this</span
+                            >
+                        </div>
+                    </div>
+                    <div class="comparison-card good">
+                        <h3>node-webcodecs</h3>
+                        <div class="code-block">
+                            <span class="keyword">for await</span> (<span
+                                class="keyword"
+                                >const</span
+                            >
+                            frame <span class="keyword">of</span>
+                            <span class="function">decodeVideo</span>(template))
+                            {<br />
+                            &nbsp;&nbsp;<span class="keyword">const</span> t =
+                            frame.timestamp /
+                            <span class="string">1_000_000</span>;<br /><br />
+                            &nbsp;&nbsp;<span class="keyword">if</span> (t >=
+                            <span class="string">2</span> && t <=
+                            <span class="string">8</span>) {<br />
+                            &nbsp;&nbsp;&nbsp;&nbsp;<span class="function"
+                                >drawText</span
+                            >(frame, customerName);<br />
+                            &nbsp;&nbsp;}<br /><br />
+                            &nbsp;&nbsp;<span class="keyword">const</span> x = t
+                            < <span class="string">5</span> ?
+                            <span class="string">10</span> :
+                            <span class="string">100</span>;<br />
+                            &nbsp;&nbsp;<span class="function"
+                                >compositeImage</span
+                            >(frame, logo, { x, y:
+                            <span class="string">10</span> });<br /><br />
+                            &nbsp;&nbsp;encoder.<span class="function"
+                                >encode</span
+                            >(frame);<br />
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="usecases" id="usecases">
+            <div class="container">
+                <div class="section-label">Use Cases</div>
+                <h2>Built for specific problems</h2>
+                <p class="usecases-intro">
+                    Not "video processing in JS would be nice." These are the
+                    scenarios where WebCodecs architecture provides genuine
+                    engineering value.
+                </p>
+
+                <div class="usecase">
+                    <div class="usecase-info">
+                        <div class="usecase-number">01</div>
+                        <h3 class="usecase-title">Isomorphic Video Editors</h3>
+                        <div class="usecase-who">
+                            Kapwing, Veed.io, Canva Video, Descript
+                        </div>
+                        <p class="usecase-description">
+                            Browser preview uses WebCodecs. Server export uses
+                            FFmpeg. Two codepaths. Two sets of bugs. Endless
+                            parity issues between what users see and what they
+                            get.
+                        </p>
+                        <div class="usecase-benefit">
+                            Same effects code runs browser and server. Visual
+                            parity guaranteed. One codebase to maintain.
+                        </div>
+                    </div>
+                    <div class="code-block">
+                        <span class="comment">// effects/textOverlay.js</span
+                        ><br />
+                        <span class="comment"
+                            >// Runs identically in browser AND server</span
+                        ><br /><br />
+                        <span class="keyword">export function</span>
+                        <span class="function">applyTextOverlay</span>(frame,
+                        config) {<br />
+                        &nbsp;&nbsp;<span class="keyword">const</span> ctx =
+                        <span class="function">getContext</span>(frame);<br />
+                        &nbsp;&nbsp;ctx.font = config.font;<br />
+                        &nbsp;&nbsp;ctx.fillStyle = config.color;<br />
+                        &nbsp;&nbsp;ctx.<span class="function">fillText</span
+                        >(config.text, config.x, config.y);<br />
+                        &nbsp;&nbsp;<span class="keyword">return</span>
+                        frame;<br />
+                        }
+                    </div>
+                </div>
+
+                <div class="usecase">
+                    <div class="usecase-info">
+                        <div class="usecase-number">02</div>
+                        <h3 class="usecase-title">
+                            WebRTC Real-Time Composition
+                        </h3>
+                        <div class="usecase-who">
+                            Riverside.fm, Streamyard, Squadcast
+                        </div>
+                        <p class="usecase-description">
+                            Recording multi-party calls with custom layouts
+                            requires screen capture (lossy) or separate native
+                            pipelines. Neither integrates with your Node WebRTC
+                            server.
+                        </p>
+                        <div class="usecase-benefit">
+                            Decode, composite, and re-encode in the same Node
+                            process handling your signaling. Real-time
+                            picture-in-picture without leaving JavaScript.
+                        </div>
+                    </div>
+                    <div class="code-block">
+                        <span class="comment">// In your Mediasoup server</span
+                        ><br /><br />
+                        participants.<span class="function">forEach</span>(p =>
+                        {<br />
+                        &nbsp;&nbsp;<span class="keyword">const</span> decoder =
+                        <span class="keyword">new</span>
+                        <span class="function">VideoDecoder</span>({<br />
+                        &nbsp;&nbsp;&nbsp;&nbsp;output: frame => frames.<span
+                            class="function"
+                            >set</span
+                        >(p.id, frame)<br />
+                        &nbsp;&nbsp;});<br />
+                        &nbsp;&nbsp;p.videoTrack.<span class="function"
+                            >pipe</span
+                        >(decoder);<br />
+                        });<br /><br />
+                        <span class="comment"
+                            >// Composite all participants in real-time</span
+                        ><br />
+                        <span class="keyword">const</span> composed =
+                        <span class="function">composePiP</span>(frames,
+                        layout);<br />
+                        encoder.<span class="function">encode</span>(composed);
+                    </div>
+                </div>
+
+                <div class="usecase">
+                    <div class="usecase-info">
+                        <div class="usecase-number">03</div>
+                        <h3 class="usecase-title">Live Highlight Clipping</h3>
+                        <div class="usecase-who">
+                            Twitch clippers, sports highlights, surveillance
+                        </div>
+                        <p class="usecase-description">
+                            Current pipelines analyze streams separately from
+                            recording. Timestamp handoff is lossy. Clips cut at
+                            keyframes, not the actual moment.
+                        </p>
+                        <div class="usecase-benefit">
+                            Single pipeline. Frame analyzed = frame encoded. No
+                            timestamp drift. Frame-accurate clips from live
+                            streams.
+                        </div>
+                    </div>
+                    <div class="code-block">
+                        <span class="keyword">const</span> decoder =
+                        <span class="keyword">new</span>
+                        <span class="function">VideoDecoder</span>({<br />
+                        &nbsp;&nbsp;output:
+                        <span class="keyword">async</span> (frame) => {<br />
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword"
+                            >const</span
+                        >
+                        dominated = <span class="keyword">await</span>
+                        <span class="function">detectKill</span
+                        >(frame);<br /><br />
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">if</span>
+                        (dominated && !clipping) {<br />
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span
+                            class="function"
+                            >startClip</span
+                        >(frame.timestamp);<br />
+                        &nbsp;&nbsp;&nbsp;&nbsp;}<br /><br />
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">if</span>
+                        (clipping) {<br />
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;clipEncoder.<span
+                            class="function"
+                            >encode</span
+                        >(frame);<br />
+                        &nbsp;&nbsp;&nbsp;&nbsp;}<br />
+                        &nbsp;&nbsp;}<br />
+                        });
+                    </div>
+                </div>
+
+                <div class="usecase">
+                    <div class="usecase-info">
+                        <div class="usecase-number">04</div>
+                        <h3 class="usecase-title">Video Ingest Validation</h3>
+                        <div class="usecase-who">
+                            Video platforms, asset management, UGC sites
+                        </div>
+                        <p class="usecase-description">
+                            ffprobe gives you container metadata. It doesn't
+                            tell you if frames are actually decodable, if there
+                            are frozen segments, or visual corruption.
+                        </p>
+                        <div class="usecase-benefit">
+                            Programmatic frame-by-frame validation. Detect black
+                            frames, frozen video, decode errors. Actual quality
+                            assurance, not metadata parsing.
+                        </div>
+                    </div>
+                    <div class="code-block">
+                        <span class="keyword">async function</span>
+                        <span class="function">validateVideo</span>(file) {<br />
+                        &nbsp;&nbsp;<span class="keyword">let</span> frozen =
+                        <span class="string">0</span>, black =
+                        <span class="string">0</span>, lastHash;<br /><br />
+                        &nbsp;&nbsp;<span class="keyword">for await</span>
+                        (<span class="keyword">const</span> frame
+                        <span class="keyword">of</span>
+                        <span class="function">decode</span>(file)) {<br />
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword"
+                            >const</span
+                        >
+                        hash =
+                        <span class="function">perceptualHash</span
+                        >(frame);<br />
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">if</span>
+                        (hash === lastHash) frozen++;<br />
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">if</span>
+                        (<span class="function">isBlack</span>(frame))
+                        black++;<br />
+                        &nbsp;&nbsp;&nbsp;&nbsp;lastHash = hash;<br />
+                        &nbsp;&nbsp;}<br /><br />
+                        &nbsp;&nbsp;<span class="keyword">return</span> {
+                        decodable: <span class="string">true</span>, frozen,
+                        black };<br />
+                        }
+                    </div>
+                </div>
+
+                <div class="usecase">
+                    <div class="usecase-info">
+                        <div class="usecase-number">05</div>
+                        <h3 class="usecase-title">
+                            Personalized Video Generation
+                        </h3>
+                        <div class="usecase-who">
+                            Marketing automation, dynamic ads, video APIs
+                        </div>
+                        <p class="usecase-description">
+                            Template-based video with dynamic content means
+                            string-templating FFmpeg commands. Conditional logic
+                            becomes unreadable filter graphs.
+                        </p>
+                        <div class="usecase-benefit">
+                            Actual programming for video assembly. Variables,
+                            loops, conditionals. Per-frame encoding control.
+                            Debuggable, testable, version-controllable.
+                        </div>
+                    </div>
+                    <div class="code-block">
+                        <span class="keyword">for await</span> (<span
+                            class="keyword"
+                            >const</span
+                        >
+                        frame <span class="keyword">of</span>
+                        <span class="function">decode</span>(template)) {<br />
+                        &nbsp;&nbsp;<span class="keyword">const</span> t =
+                        frame.timestamp /
+                        <span class="string">1e6</span>;<br /><br />
+                        &nbsp;&nbsp;<span class="comment"
+                            >// Actual programming, not filter DSL</span
+                        ><br />
+                        &nbsp;&nbsp;<span class="keyword">if</span>
+                        (customer.isPremium) {<br />
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="function"
+                            >addGoldBorder</span
+                        >(frame);<br />
+                        &nbsp;&nbsp;}<br /><br />
+                        &nbsp;&nbsp;<span class="function">drawText</span
+                        >(frame, customer.name, positions[t]);<br />
+                        &nbsp;&nbsp;encoder.<span class="function">encode</span
+                        >(frame, {<br />
+                        &nbsp;&nbsp;&nbsp;&nbsp;keyFrame: t %
+                        <span class="string">2</span> ===
+                        <span class="string">0</span><br />
+                        &nbsp;&nbsp;});<br />
+                        }
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="features" id="features">
+            <div class="container">
+                <div class="section-label">Architecture</div>
+                <h2>What you actually get</h2>
+                <div class="features-grid">
+                    <div class="feature">
+                        <div class="feature-icon">⎔</div>
+                        <h3>Frame-Accurate Control</h3>
+                        <p>
+                            Encode, decode, seek to exact frames. Per-frame
+                            encoding parameters. Keyframe insertion where you
+                            want it.
+                        </p>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">◇</div>
+                        <h3>Streaming Backpressure</h3>
+                        <p>
+                            Native integration with Node streams.
+                            encodeQueueSize for flow control. Memory-bounded
+                            processing.
+                        </p>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">▣</div>
+                        <h3>Hardware Acceleration</h3>
+                        <p>
+                            Access to platform encoders/decoders. Queryable
+                            capability support. GPU path when available.
+                        </p>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">◈</div>
+                        <h3>Browser API Parity</h3>
+                        <p>
+                            Same VideoEncoder, VideoDecoder, VideoFrame
+                            interfaces. Code runs both environments unchanged.
+                        </p>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">⬡</div>
+                        <h3>Explicit Memory</h3>
+                        <p>
+                            VideoFrame.close() for deterministic cleanup. No GC
+                            surprises. Predictable resource management.
+                        </p>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">◎</div>
+                        <h3>TypeScript Native</h3>
+                        <p>
+                            Full type definitions. Autocomplete for codec
+                            configs. Catch errors at compile time.
+                        </p>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">⬢</div>
+                        <h3>Runs on Bun</h3>
+                        <p>
+                            Full compatibility with Bun runtime via N-API. Same
+                            package, both runtimes. No separate install.
+                        </p>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">◐</div>
+                        <h3>HDR & Wide Gamut</h3>
+                        <p>
+                            BT.2020 primaries, PQ (HDR10) and HLG transfer
+                            functions. Encode HDR content without color space
+                            conversion.
+                        </p>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">▦</div>
+                        <h3>ImageDecoder</h3>
+                        <p>
+                            Decode JPEG, PNG, GIF, WebP, BMP. Extract frames
+                            from animated GIFs with timing info.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="cta">
+            <div class="container">
+                <h2>
+                    Video as a <span>first-class type</span><br />in Node.js
+                </h2>
+                <p>Frame-level access without leaving JavaScript.</p>
+                <div class="cta-actions">
+                    <div
+                        class="install-cmd"
+                        onclick="
+                            navigator.clipboard.writeText(
+                                'npm install node-webcodecs',
+                            )
+                        "
+                    >
+                        <span class="prompt">$</span>
+                        <span>npm install node-webcodecs</span>
+                        <span class="copy">copy</span>
+                    </div>
+                    <div
+                        class="install-cmd"
+                        onclick="
+                            navigator.clipboard.writeText(
+                                'bun add node-webcodecs',
+                            )
+                        "
+                    >
+                        <span class="prompt">$</span>
+                        <span>bun add node-webcodecs</span>
+                        <span class="copy">copy</span>
+                    </div>
+                    <a
+                        href="https://github.com/caseymanos/node-webcodecs"
+                        class="btn-secondary"
+                    >
+                        View on GitHub
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <div class="container">
+                <p>
+                    node-webcodecs — Built by
+                    <a href="https://caseymanos.com">Casey Manos</a>
+                </p>
+                <a href="https://github.com/caseymanos/node-webcodecs"
+                    >GitHub</a
+                >
+            </div>
+        </footer>
+
+        <script>
+            // Copy feedback
+            document.querySelectorAll(".install-cmd").forEach((cmd) => {
+                cmd.addEventListener("click", () => {
+                    const copySpan = cmd.querySelector(".copy");
+                    const original = copySpan.textContent;
+                    copySpan.textContent = "copied!";
+                    setTimeout(() => (copySpan.textContent = original), 2000);
+                });
+            });
+
+            // Intersection observer for fade-in animations
+            const observer = new IntersectionObserver(
+                (entries) => {
+                    entries.forEach((entry) => {
+                        if (entry.isIntersecting) {
+                            entry.target.style.opacity = "1";
+                            entry.target.style.transform = "translateY(0)";
+                        }
+                    });
+                },
+                { threshold: 0.1 },
+            );
+
+            document.querySelectorAll(".usecase, .feature").forEach((el) => {
+                el.style.opacity = "0";
+                el.style.transform = "translateY(20px)";
+                el.style.transition = "opacity 0.6s ease, transform 0.6s ease";
+                observer.observe(el);
+            });
+        </script>
+    </body>
+</html>
