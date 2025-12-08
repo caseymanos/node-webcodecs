@@ -180,6 +180,8 @@ export interface VideoEncoderOutputMetadata {
     codedHeight: number;
     /** Codec-specific extradata (e.g., H.264 SPS/PPS, VP9 CodecPrivate) */
     description?: ArrayBuffer;
+    /** Color space information */
+    colorSpace?: VideoColorSpaceInit;
   };
 
   /**
@@ -286,6 +288,7 @@ export class VideoEncoder {
   private _outputCallback: (chunk: EncodedVideoChunk, metadata?: VideoEncoderOutputMetadata) => void;
   private _errorCallback: (error: DOMException) => void;
   private _encodeQueueSize: number = 0;
+  private _pendingCallbacks: number = 0;  // Track pending setImmediate callbacks
   private _config: VideoEncoderConfig | null = null;
   private _sentDecoderConfig: boolean = false;
   private _listeners: Map<string, Set<() => void>> = new Map();
@@ -749,10 +752,14 @@ export class VideoEncoder {
     }
 
     return new Promise((resolve, reject) => {
-      this._native.flush((err: Error | null) => {
+      this._native.flush(async (err: Error | null) => {
         if (err) {
           reject(new DOMException(err.message, 'EncodingError'));
         } else {
+          // Wait for any pending setImmediate callbacks to complete
+          while (this._pendingCallbacks > 0) {
+            await new Promise(r => setImmediate(r));
+          }
           resolve();
         }
       });
@@ -824,36 +831,55 @@ export class VideoEncoder {
   }
 
   private _onChunk(data: Uint8Array, isKeyframe: boolean, timestamp: number, duration: number, extradata?: Uint8Array): void {
-    this._encodeQueueSize = Math.max(0, this._encodeQueueSize - 1);
-    this._dispatchEvent('dequeue');
+    // Copy data immediately since native buffer may be recycled
+    const dataCopy = new Uint8Array(data);
+    const extradataCopy = extradata ? new Uint8Array(extradata) : undefined;
 
-    const chunk = new EncodedVideoChunk({
-      type: isKeyframe ? 'key' : 'delta',
-      timestamp,
-      duration: duration > 0 ? duration : undefined,
-      data,
+    this._pendingCallbacks++;
+
+    // Defer callback to ensure encodeQueueSize > 0 when encode() returns
+    setImmediate(() => {
+      this._pendingCallbacks--;
+      this._encodeQueueSize = Math.max(0, this._encodeQueueSize - 1);
+      this._dispatchEvent('dequeue');
+
+      const chunk = new EncodedVideoChunk({
+        type: isKeyframe ? 'key' : 'delta',
+        timestamp,
+        duration: duration > 0 ? duration : undefined,
+        data: dataCopy,
+      });
+
+      let metadata: VideoEncoderOutputMetadata | undefined;
+
+      // Send decoder config with first keyframe
+      if (isKeyframe && !this._sentDecoderConfig && this._config) {
+        // Default color space for encoded video - use sRGB for RGBA source
+        const colorSpace = this._config.colorSpace ?? {
+          primaries: 'bt709',
+          transfer: 'iec61966-2-1',
+          matrix: 'rgb',
+          fullRange: true,
+        };
+
+        metadata = {
+          decoderConfig: {
+            codec: this._config.codec,
+            codedWidth: this._config.width,
+            codedHeight: this._config.height,
+            description: extradataCopy ? extradataCopy.buffer as ArrayBuffer : undefined,
+            colorSpace,
+          },
+        };
+        this._sentDecoderConfig = true;
+      }
+
+      try {
+        this._outputCallback(chunk, metadata);
+      } catch (e) {
+        // Don't propagate callback errors
+      }
     });
-
-    let metadata: VideoEncoderOutputMetadata | undefined;
-
-    // Send decoder config with first keyframe
-    if (isKeyframe && !this._sentDecoderConfig && this._config) {
-      metadata = {
-        decoderConfig: {
-          codec: this._config.codec,
-          codedWidth: this._config.width,
-          codedHeight: this._config.height,
-          description: extradata ? new Uint8Array(extradata).buffer as ArrayBuffer : undefined,
-        },
-      };
-      this._sentDecoderConfig = true;
-    }
-
-    try {
-      this._outputCallback(chunk, metadata);
-    } catch (e) {
-      // Don't propagate callback errors
-    }
   }
 
   private _onError(message: string): void {

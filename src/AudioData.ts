@@ -67,12 +67,32 @@ export class AudioData {
   private _closed: boolean = false;
   private _buffer: Uint8Array | null = null;
 
-  readonly format: AudioSampleFormat | null;
-  readonly sampleRate: number;
-  readonly numberOfFrames: number;
-  readonly numberOfChannels: number;
-  readonly duration: number;  // microseconds
-  readonly timestamp: number;
+  private _format: AudioSampleFormat | null;
+  private _sampleRate: number;
+  private _numberOfFrames: number;
+  private _numberOfChannels: number;
+  private _duration: number;  // microseconds
+  private _timestamp: number;
+
+  // Per WebCodecs spec, after close() these should return null/0
+  get format(): AudioSampleFormat | null {
+    return this._closed ? null : this._format;
+  }
+  get sampleRate(): number {
+    return this._closed ? 0 : this._sampleRate;
+  }
+  get numberOfFrames(): number {
+    return this._closed ? 0 : this._numberOfFrames;
+  }
+  get numberOfChannels(): number {
+    return this._closed ? 0 : this._numberOfChannels;
+  }
+  get duration(): number {
+    return this._closed ? 0 : this._duration;
+  }
+  get timestamp(): number {
+    return this._closed ? 0 : this._timestamp;
+  }
 
   constructor(init: AudioDataInit) {
     if (!init.format) {
@@ -125,13 +145,13 @@ export class AudioData {
       }
     }
 
-    this.format = init.format;
-    this.sampleRate = init.sampleRate;
-    this.numberOfFrames = init.numberOfFrames;
-    this.numberOfChannels = init.numberOfChannels;
-    this.timestamp = init.timestamp;
+    this._format = init.format;
+    this._sampleRate = init.sampleRate;
+    this._numberOfFrames = init.numberOfFrames;
+    this._numberOfChannels = init.numberOfChannels;
+    this._timestamp = init.timestamp;
     // Duration in microseconds: (frames / sampleRate) * 1,000,000
-    this.duration = Math.floor((init.numberOfFrames / init.sampleRate) * 1_000_000);
+    this._duration = Math.floor((init.numberOfFrames / init.sampleRate) * 1_000_000);
   }
 
   /**

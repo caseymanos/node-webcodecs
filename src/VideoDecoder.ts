@@ -49,6 +49,7 @@ export class VideoDecoder {
   private _outputCallback: (frame: VideoFrame) => void;
   private _errorCallback: (error: DOMException) => void;
   private _decodeQueueSize: number = 0;
+  private _pendingCallbacks: number = 0;  // Track pending setImmediate callbacks
   private _config: VideoDecoderConfig | null = null;
   private _listeners: Map<string, Set<() => void>> = new Map();
   private _useAsync: boolean = true;
@@ -258,12 +259,21 @@ export class VideoDecoder {
     chunk.copyTo(data);
 
     this._decodeQueueSize++;
+    this._pendingCallbacks++;
     this._native.decode(
       Buffer.from(data),
       chunk.type === 'key',
       chunk.timestamp,
       chunk.duration ?? 0
     );
+
+    // Per WebCodecs spec, dequeue fires when input is consumed from queue
+    // Use setImmediate to ensure decodeQueueSize > 0 when decode() returns
+    setImmediate(() => {
+      this._pendingCallbacks--;
+      this._decodeQueueSize = Math.max(0, this._decodeQueueSize - 1);
+      this._dispatchEvent('dequeue');
+    });
   }
 
   async flush(): Promise<void> {
@@ -272,10 +282,14 @@ export class VideoDecoder {
     }
 
     return new Promise((resolve, reject) => {
-      this._native.flush((err: Error | null) => {
+      this._native.flush(async (err: Error | null) => {
         if (err) {
           reject(new DOMException(err.message, 'EncodingError'));
         } else {
+          // Wait for any pending setImmediate callbacks to complete
+          while (this._pendingCallbacks > 0) {
+            await new Promise(r => setImmediate(r));
+          }
           resolve();
         }
       });
@@ -307,20 +321,17 @@ export class VideoDecoder {
   }
 
   private _onFrame(nativeFrame: any, timestamp: number, duration: number): void {
-    this._decodeQueueSize = Math.max(0, this._decodeQueueSize - 1);
-    this._dispatchEvent('dequeue');
+    // Get frame info from native immediately since nativeFrame may be recycled
+    const width = nativeFrame.width;
+    const height = nativeFrame.height;
+    const format = nativeFrame.format || 'I420';
+    const size = nativeFrame.allocationSize();
+    const buffer = Buffer.alloc(size);
+    nativeFrame.copyTo(buffer);
 
+    // Output frames are delivered asynchronously
+    // Queue size management and dequeue events are handled in decode()
     try {
-      // Get frame info from native
-      const width = nativeFrame.width;
-      const height = nativeFrame.height;
-      const format = nativeFrame.format || 'I420';
-
-      // Get the data from the native frame
-      const size = nativeFrame.allocationSize();
-      const buffer = Buffer.alloc(size);
-      nativeFrame.copyTo(buffer);
-
       // Create VideoFrame
       const frame = new VideoFrame(buffer, {
         format: format,

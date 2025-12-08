@@ -64,15 +64,45 @@ export class VideoFrame {
   private _closed: boolean = false;
   private _buffer: Uint8Array | null = null;
 
-  readonly format: VideoPixelFormat | null;
-  readonly codedWidth: number;
-  readonly codedHeight: number;
-  readonly displayWidth: number;
-  readonly displayHeight: number;
-  readonly timestamp: number;
-  readonly duration: number | null;
-  readonly colorSpace: VideoColorSpace;
-  readonly visibleRect: DOMRectReadOnly | null;
+  private _format: VideoPixelFormat | null;
+  private _codedWidth: number;
+  private _codedHeight: number;
+  private _displayWidth: number;
+  private _displayHeight: number;
+  private _timestamp: number;
+  private _duration: number | null;
+  private _colorSpace: VideoColorSpace;
+  private _visibleRect: DOMRectReadOnly | null;
+
+  // Per WebCodecs spec, after close() these should return null/0
+  // Note: timestamp is preserved after close per spec
+  get format(): VideoPixelFormat | null {
+    return this._closed ? null : this._format;
+  }
+  get codedWidth(): number {
+    return this._closed ? 0 : this._codedWidth;
+  }
+  get codedHeight(): number {
+    return this._closed ? 0 : this._codedHeight;
+  }
+  get displayWidth(): number {
+    return this._closed ? 0 : this._displayWidth;
+  }
+  get displayHeight(): number {
+    return this._closed ? 0 : this._displayHeight;
+  }
+  get timestamp(): number {
+    return this._timestamp;  // Preserved after close
+  }
+  get duration(): number | null {
+    return this._closed ? null : this._duration;
+  }
+  get colorSpace(): VideoColorSpace {
+    return this._colorSpace;
+  }
+  get visibleRect(): DOMRectReadOnly | null {
+    return this._closed ? null : this._visibleRect;
+  }
 
   constructor(data: BufferSource, init: VideoFrameBufferInit);
   constructor(image: VideoFrame, init?: VideoFrameInit);
@@ -85,15 +115,15 @@ export class VideoFrame {
 
       this._native = dataOrImage._native ? dataOrImage._native.clone() : null;
       this._buffer = dataOrImage._buffer ? new Uint8Array(dataOrImage._buffer) : null;
-      this.format = dataOrImage.format;
-      this.codedWidth = dataOrImage.codedWidth;
-      this.codedHeight = dataOrImage.codedHeight;
-      this.displayWidth = init?.displayWidth ?? dataOrImage.displayWidth;
-      this.displayHeight = init?.displayHeight ?? dataOrImage.displayHeight;
-      this.timestamp = init?.timestamp ?? dataOrImage.timestamp;
-      this.duration = init?.duration ?? dataOrImage.duration;
-      this.colorSpace = dataOrImage.colorSpace;
-      this.visibleRect = dataOrImage.visibleRect;
+      this._format = dataOrImage._format;
+      this._codedWidth = dataOrImage._codedWidth;
+      this._codedHeight = dataOrImage._codedHeight;
+      this._displayWidth = init?.displayWidth ?? dataOrImage._displayWidth;
+      this._displayHeight = init?.displayHeight ?? dataOrImage._displayHeight;
+      this._timestamp = init?.timestamp ?? dataOrImage._timestamp;
+      this._duration = init?.duration ?? dataOrImage._duration;
+      this._colorSpace = dataOrImage._colorSpace;
+      this._visibleRect = dataOrImage._visibleRect;
     } else {
       // Create from buffer
       const bufferInit = init as VideoFrameBufferInit;
@@ -135,15 +165,28 @@ export class VideoFrame {
         }
       }
 
-      this.format = bufferInit.format;
-      this.codedWidth = bufferInit.codedWidth;
-      this.codedHeight = bufferInit.codedHeight;
-      this.displayWidth = bufferInit.displayWidth ?? bufferInit.codedWidth;
-      this.displayHeight = bufferInit.displayHeight ?? bufferInit.codedHeight;
-      this.timestamp = bufferInit.timestamp;
-      this.duration = bufferInit.duration ?? null;
-      this.colorSpace = new VideoColorSpace(bufferInit.colorSpace);
-      this.visibleRect = bufferInit.visibleRect
+      this._format = bufferInit.format;
+      this._codedWidth = bufferInit.codedWidth;
+      this._codedHeight = bufferInit.codedHeight;
+      this._displayWidth = bufferInit.displayWidth ?? bufferInit.codedWidth;
+      this._displayHeight = bufferInit.displayHeight ?? bufferInit.codedHeight;
+      this._timestamp = bufferInit.timestamp;
+      this._duration = bufferInit.duration ?? null;
+
+      // Set default color space based on pixel format per WebCodecs spec
+      // RGB formats default to sRGB, YUV formats default to BT.709
+      const isRgbFormat = ['RGBA', 'RGBX', 'BGRA', 'BGRX'].includes(bufferInit.format);
+      const defaultColorSpace = isRgbFormat
+        ? { primaries: 'bt709' as const, transfer: 'iec61966-2-1' as const, matrix: 'rgb' as const, fullRange: true }
+        : { primaries: 'bt709' as const, transfer: 'bt709' as const, matrix: 'bt709' as const, fullRange: false };
+
+      this._colorSpace = new VideoColorSpace({
+        primaries: bufferInit.colorSpace?.primaries ?? defaultColorSpace.primaries,
+        transfer: bufferInit.colorSpace?.transfer ?? defaultColorSpace.transfer,
+        matrix: bufferInit.colorSpace?.matrix ?? defaultColorSpace.matrix,
+        fullRange: bufferInit.colorSpace?.fullRange ?? defaultColorSpace.fullRange,
+      });
+      this._visibleRect = bufferInit.visibleRect
         ? new DOMRectReadOnly(
             bufferInit.visibleRect.x,
             bufferInit.visibleRect.y,

@@ -46,6 +46,7 @@ export class AudioEncoder {
   private _outputCallback: (chunk: EncodedAudioChunk, metadata?: AudioEncoderOutputMetadata) => void;
   private _errorCallback: (error: DOMException) => void;
   private _encodeQueueSize: number = 0;
+  private _pendingCallbacks: number = 0;  // Track pending setImmediate callbacks
   private _config: AudioEncoderConfig | null = null;
   private _sentDecoderConfig: boolean = false;
   private _listeners: Map<string, Set<() => void>> = new Map();
@@ -196,6 +197,7 @@ export class AudioEncoder {
     data.copyTo(buffer, { planeIndex: 0 });
 
     this._encodeQueueSize++;
+    this._pendingCallbacks++;
     this._native.encode(
       new Float32Array(buffer),
       data.format,
@@ -204,6 +206,14 @@ export class AudioEncoder {
       data.numberOfChannels,
       data.timestamp
     );
+
+    // Per WebCodecs spec, dequeue fires when input is consumed from queue
+    // Use setImmediate to ensure encodeQueueSize > 0 when encode() returns
+    setImmediate(() => {
+      this._pendingCallbacks--;
+      this._encodeQueueSize = Math.max(0, this._encodeQueueSize - 1);
+      this._dispatchEvent('dequeue');
+    });
   }
 
   async flush(): Promise<void> {
@@ -212,10 +222,14 @@ export class AudioEncoder {
     }
 
     return new Promise((resolve, reject) => {
-      this._native.flush((err: Error | null) => {
+      this._native.flush(async (err: Error | null) => {
         if (err) {
           reject(new DOMException(err.message, 'EncodingError'));
         } else {
+          // Wait for any pending setImmediate callbacks to complete
+          while (this._pendingCallbacks > 0) {
+            await new Promise(r => setImmediate(r));
+          }
           resolve();
         }
       });
@@ -248,9 +262,8 @@ export class AudioEncoder {
   }
 
   private _onChunk(data: Uint8Array, timestamp: number, duration: number, extradata?: Uint8Array): void {
-    this._encodeQueueSize = Math.max(0, this._encodeQueueSize - 1);
-    this._dispatchEvent('dequeue');
-
+    // Output chunks are delivered asynchronously
+    // Queue size management and dequeue events are handled in encode()
     const chunk = new EncodedAudioChunk({
       type: 'key',  // Audio frames are typically all keyframes
       timestamp,

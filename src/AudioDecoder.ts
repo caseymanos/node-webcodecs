@@ -36,6 +36,7 @@ export class AudioDecoder {
   private _decodeQueueSize: number = 0;
   private _config: AudioDecoderConfig | null = null;
   private _ondequeue: ((event: Event) => void) | null = null;
+  private _listeners: Map<string, Set<() => void>> = new Map();
 
   static async isConfigSupported(config: AudioDecoderConfig): Promise<AudioDecoderSupport> {
     const supported = isAudioCodecSupported(config.codec);
@@ -78,6 +79,65 @@ export class AudioDecoder {
 
   set ondequeue(handler: ((event: Event) => void) | null) {
     this._ondequeue = handler;
+  }
+
+  /**
+   * Minimal EventTarget-style API for 'dequeue' events.
+   * Enables compatibility with MediaBunny and browser WebCodecs code.
+   */
+  addEventListener(type: string, listener: () => void, options?: { once?: boolean }): void {
+    if (typeof listener !== 'function') return;
+
+    const once = !!(options && (options as any).once);
+    const wrapper = once
+      ? () => {
+          this.removeEventListener(type, wrapper);
+          listener();
+        }
+      : listener;
+
+    let set = this._listeners.get(type);
+    if (!set) {
+      set = new Set();
+      this._listeners.set(type, set);
+    }
+    set.add(wrapper);
+  }
+
+  removeEventListener(type: string, listener: () => void): void {
+    const set = this._listeners.get(type);
+    if (!set) return;
+
+    if (set.has(listener)) {
+      set.delete(listener);
+    }
+
+    if (set.size === 0) {
+      this._listeners.delete(type);
+    }
+  }
+
+  private _dispatchEvent(type: string): void {
+    // Call the ondequeue handler if it exists
+    if (type === 'dequeue' && this._ondequeue) {
+      try {
+        this._ondequeue(new Event('dequeue'));
+      } catch {
+        // Swallow handler errors
+      }
+    }
+
+    // Call registered listeners
+    const set = this._listeners.get(type);
+    if (set) {
+      for (const listener of set) {
+        try {
+          listener();
+        } catch {
+          // Swallow handler errors
+        }
+      }
+    }
   }
 
   configure(config: AudioDecoderConfig): void {
@@ -128,6 +188,8 @@ export class AudioDecoder {
     chunk.copyTo(data);
 
     this._decodeQueueSize++;
+
+    // Call native decode synchronously
     this._native.decode(
       Buffer.from(data),
       chunk.type === 'key',
@@ -184,31 +246,32 @@ export class AudioDecoder {
     numberOfChannels: number,
     timestamp: number
   ): void {
-    this._decodeQueueSize = Math.max(0, this._decodeQueueSize - 1);
-    
-    // Dispatch dequeue event
-    if (this._ondequeue) {
+    // Copy buffer data immediately since native buffer may be recycled
+    const bufferCopy = new Uint8Array(buffer);
+
+    // Defer callback to ensure decodeQueueSize > 0 when decode() returns
+    // Use setImmediate to allow the event loop to process the listener registration
+    setImmediate(() => {
+      this._decodeQueueSize = Math.max(0, this._decodeQueueSize - 1);
+
+      // Dispatch dequeue event
+      this._dispatchEvent('dequeue');
+
       try {
-        this._ondequeue(new Event('dequeue'));
-      } catch {
-        // Swallow handler errors
+        const audioData = new AudioData({
+          format: format as AudioSampleFormat,
+          sampleRate,
+          numberOfFrames,
+          numberOfChannels,
+          timestamp,
+          data: bufferCopy.buffer as ArrayBuffer,
+        });
+
+        this._outputCallback(audioData);
+      } catch (e) {
+        console.error('AudioDecoder output callback error:', e);
       }
-    }
-
-    try {
-      const audioData = new AudioData({
-        format: format as AudioSampleFormat,
-        sampleRate,
-        numberOfFrames,
-        numberOfChannels,
-        timestamp,
-        data: new Uint8Array(buffer).buffer as ArrayBuffer,
-      });
-
-      this._outputCallback(audioData);
-    } catch (e) {
-      console.error('AudioDecoder output callback error:', e);
-    }
+    });
   }
 
   private _onError(message: string): void {
