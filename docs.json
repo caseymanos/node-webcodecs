@@ -107,5 +107,39 @@
       "github": "https://github.com/caseymanos/node-webcodecs",
       "twitter": "https://twitter.com/caseymanos"
     }
-  }
+  },
+  "redirects": [
+    {
+      "source": "/introduction",
+      "destination": "/docs/introduction"
+    },
+    {
+      "source": "/getting-started/:slug*",
+      "destination": "/docs/getting-started/:slug*"
+    },
+    {
+      "source": "/migration/:slug*",
+      "destination": "/docs/migration/:slug*"
+    },
+    {
+      "source": "/api-reference/:slug*",
+      "destination": "/docs/api-reference/:slug*"
+    },
+    {
+      "source": "/guides/:slug*",
+      "destination": "/docs/guides/:slug*"
+    },
+    {
+      "source": "/cookbook/:slug*",
+      "destination": "/docs/cookbook/:slug*"
+    },
+    {
+      "source": "/examples/:slug*",
+      "destination": "/docs/examples/:slug*"
+    },
+    {
+      "source": "/troubleshooting/:slug*",
+      "destination": "/docs/troubleshooting/:slug*"
+    }
+  ]
 }
