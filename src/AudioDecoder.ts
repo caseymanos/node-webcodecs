@@ -247,7 +247,8 @@ export class AudioDecoder {
     timestamp: number
   ): void {
     // Copy buffer data immediately since native buffer may be recycled
-    const bufferCopy = new Uint8Array(buffer);
+    // Create a proper byte-level copy of the Float32Array
+    const bufferCopy = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength).slice();
 
     // Defer callback to ensure decodeQueueSize > 0 when decode() returns
     // Use setImmediate to allow the event loop to process the listener registration

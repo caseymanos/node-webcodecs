@@ -717,7 +717,16 @@ export class VideoEncoder {
     const keyFrame = options?.keyFrame ?? false;
 
     this._encodeQueueSize++;
+    this._pendingCallbacks++;
     this._native.encode(nativeFrame, frame.timestamp, keyFrame);
+
+    // Per WebCodecs spec, dequeue fires when input is consumed from queue
+    // Use setImmediate to ensure encodeQueueSize > 0 when encode() returns
+    setImmediate(() => {
+      this._pendingCallbacks--;
+      this._encodeQueueSize = Math.max(0, this._encodeQueueSize - 1);
+      this._dispatchEvent('dequeue');
+    });
   }
 
   /**
@@ -835,51 +844,44 @@ export class VideoEncoder {
     const dataCopy = new Uint8Array(data);
     const extradataCopy = extradata ? new Uint8Array(extradata) : undefined;
 
-    this._pendingCallbacks++;
-
-    // Defer callback to ensure encodeQueueSize > 0 when encode() returns
-    setImmediate(() => {
-      this._pendingCallbacks--;
-      this._encodeQueueSize = Math.max(0, this._encodeQueueSize - 1);
-      this._dispatchEvent('dequeue');
-
-      const chunk = new EncodedVideoChunk({
-        type: isKeyframe ? 'key' : 'delta',
-        timestamp,
-        duration: duration > 0 ? duration : undefined,
-        data: dataCopy,
-      });
-
-      let metadata: VideoEncoderOutputMetadata | undefined;
-
-      // Send decoder config with first keyframe
-      if (isKeyframe && !this._sentDecoderConfig && this._config) {
-        // Default color space for encoded video - use sRGB for RGBA source
-        const colorSpace = this._config.colorSpace ?? {
-          primaries: 'bt709',
-          transfer: 'iec61966-2-1',
-          matrix: 'rgb',
-          fullRange: true,
-        };
-
-        metadata = {
-          decoderConfig: {
-            codec: this._config.codec,
-            codedWidth: this._config.width,
-            codedHeight: this._config.height,
-            description: extradataCopy ? extradataCopy.buffer as ArrayBuffer : undefined,
-            colorSpace,
-          },
-        };
-        this._sentDecoderConfig = true;
-      }
-
-      try {
-        this._outputCallback(chunk, metadata);
-      } catch (e) {
-        // Don't propagate callback errors
-      }
+    // Output chunks are delivered asynchronously
+    // Queue size management and dequeue events are handled in encode()
+    const chunk = new EncodedVideoChunk({
+      type: isKeyframe ? 'key' : 'delta',
+      timestamp,
+      duration: duration > 0 ? duration : undefined,
+      data: dataCopy,
     });
+
+    let metadata: VideoEncoderOutputMetadata | undefined;
+
+    // Send decoder config with first keyframe
+    if (isKeyframe && !this._sentDecoderConfig && this._config) {
+      // Default color space for encoded video - use sRGB for RGBA source
+      const colorSpace = this._config.colorSpace ?? {
+        primaries: 'bt709',
+        transfer: 'iec61966-2-1',
+        matrix: 'rgb',
+        fullRange: true,
+      };
+
+      metadata = {
+        decoderConfig: {
+          codec: this._config.codec,
+          codedWidth: this._config.width,
+          codedHeight: this._config.height,
+          description: extradataCopy ? extradataCopy.buffer as ArrayBuffer : undefined,
+          colorSpace,
+        },
+      };
+      this._sentDecoderConfig = true;
+    }
+
+    try {
+      this._outputCallback(chunk, metadata);
+    } catch (e) {
+      // Don't propagate callback errors
+    }
   }
 
   private _onError(message: string): void {
