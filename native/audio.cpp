@@ -1,5 +1,6 @@
 #include "audio.h"
 #include <cstring>
+#include <vector>
 
 // ==================== AudioDataNative ====================
 
@@ -523,6 +524,12 @@ void AudioEncoderNative::Configure(const Napi::CallbackInfo& info) {
         codecCtx_->sample_fmt = AV_SAMPLE_FMT_S16;  // FLAC uses s16
     } else if (codecName == "libmp3lame") {
         codecCtx_->sample_fmt = AV_SAMPLE_FMT_FLTP; // MP3 uses float planar
+        // MP3 only supports mono or stereo - limit channels if needed
+        if (channels_ > 2) {
+            channels_ = 2;  // Downmix to stereo
+        }
+    } else if (codecName == "libvorbis") {
+        codecCtx_->sample_fmt = AV_SAMPLE_FMT_FLTP; // Vorbis uses float planar
     } else {
         // AAC and most others use float planar
         codecCtx_->sample_fmt = AV_SAMPLE_FMT_FLTP;
@@ -543,8 +550,11 @@ void AudioEncoderNative::Configure(const Napi::CallbackInfo& info) {
     if (ret < 0) {
         char errBuf[256];
         av_strerror(ret, errBuf, sizeof(errBuf));
+        std::string errMsg = std::string("Failed to open codec: ") + errBuf +
+            " (codec=" + codecName + ", sampleRate=" + std::to_string(sampleRate_) +
+            ", channels=" + std::to_string(channels_) + ", bitrate=" + std::to_string(codecCtx_->bit_rate) + ")";
         avcodec_free_context(&codecCtx_);
-        Napi::Error::New(env, std::string("Failed to open codec: ") + errBuf).ThrowAsJavaScriptException();
+        Napi::Error::New(env, errMsg).ThrowAsJavaScriptException();
         return;
     }
 
@@ -651,7 +661,35 @@ void AudioEncoderNative::EmitChunk(Napi::Env env, AVPacket* packet) {
 
     Napi::Value extradataValue = env.Undefined();
     if (codecCtx_->extradata && codecCtx_->extradata_size > 0) {
-        extradataValue = Napi::Buffer<uint8_t>::Copy(env, codecCtx_->extradata, codecCtx_->extradata_size);
+        // For FLAC, we need to wrap the STREAMINFO with "fLaC" header
+        // FLAC stream format: "fLaC" + metadata block header + STREAMINFO
+        if (codec_->id == AV_CODEC_ID_FLAC) {
+            // Build proper FLAC header: "fLaC" (4) + block header (4) + STREAMINFO (34)
+            size_t fullSize = 4 + 4 + codecCtx_->extradata_size;
+            std::vector<uint8_t> flacHeader(fullSize);
+
+            // "fLaC" stream marker
+            flacHeader[0] = 'f';
+            flacHeader[1] = 'L';
+            flacHeader[2] = 'a';
+            flacHeader[3] = 'C';
+
+            // Metadata block header: last-flag (1 bit) + type (7 bits) + size (24 bits)
+            // 0x80 = last block flag, 0x00 = STREAMINFO type
+            // Combined: 0x80 for "last STREAMINFO block"
+            flacHeader[4] = 0x80;  // Last block flag + STREAMINFO type (0)
+            // Size in big-endian (3 bytes): typically 34 for STREAMINFO
+            flacHeader[5] = (codecCtx_->extradata_size >> 16) & 0xFF;
+            flacHeader[6] = (codecCtx_->extradata_size >> 8) & 0xFF;
+            flacHeader[7] = codecCtx_->extradata_size & 0xFF;
+
+            // Copy STREAMINFO data
+            memcpy(flacHeader.data() + 8, codecCtx_->extradata, codecCtx_->extradata_size);
+
+            extradataValue = Napi::Buffer<uint8_t>::Copy(env, flacHeader.data(), fullSize);
+        } else {
+            extradataValue = Napi::Buffer<uint8_t>::Copy(env, codecCtx_->extradata, codecCtx_->extradata_size);
+        }
     }
 
     // WebCodecs spec: output timestamps should match input timestamps (in microseconds).
@@ -663,6 +701,10 @@ void AudioEncoderNative::EmitChunk(Napi::Env env, AVPacket* packet) {
         // Convert initial_padding from samples to microseconds
         int64_t paddingUs = (int64_t)codecCtx_->initial_padding * 1000000 / codecCtx_->sample_rate;
         timestampUs += paddingUs;
+    }
+    // Ensure timestamps are never negative (can happen with some codecs)
+    if (timestampUs < 0) {
+        timestampUs = 0;
     }
 
     outputCallback_.Value().Call({
