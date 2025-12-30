@@ -264,10 +264,12 @@ console.log('VP9 decoder:', hasCodec('vp9', 'decoder'));
     3. Check compiler version (GCC 7+ or Clang 5+ recommended)
   </Accordion>
 
-  <Accordion title="Prebuilt binaries not available">
-    node-webcodecs currently builds from source on install. Future releases may include prebuilt binaries for common platforms.
+  <Accordion title="Using prebuilt binaries">
+    v1.0.0+ includes prebuilt binaries for:
+    - macOS (arm64, x64)
+    - Linux (x64)
 
-    Building from source ensures compatibility with your specific FFmpeg version and hardware encoders.
+    These are automatically used if your platform matches. You still need FFmpeg libraries installed at runtime.
   </Accordion>
 </AccordionGroup>
 
