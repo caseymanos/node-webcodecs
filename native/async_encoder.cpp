@@ -118,7 +118,20 @@ void VideoEncoderAsync::configureEncoderOptions(const std::string& encoderName, 
             av_opt_set(codecCtx_->priv_data, "sync-lookahead", "0", 0);
             av_opt_set(codecCtx_->priv_data, "intra-refresh", "1", 0);
         } else {
-            av_opt_set(codecCtx_->priv_data, "preset", "medium", 0);
+            // OPTIMIZATION: Use faster presets for smaller resolutions
+            // This maintains quality for large frames while speeding up small ones
+            int pixels = width_ * height_;
+            const char* preset;
+            if (pixels <= 320 * 240) {           // QVGA or smaller
+                preset = "ultrafast";
+            } else if (pixels <= 640 * 480) {    // VGA or smaller
+                preset = "superfast";
+            } else if (pixels <= 1280 * 720) {   // 720p or smaller
+                preset = "veryfast";
+            } else {
+                preset = "medium";                // HD and above: quality matters
+            }
+            av_opt_set(codecCtx_->priv_data, "preset", preset, 0);
         }
     }
     else if (encoderName == "h264_videotoolbox" || encoderName == "hevc_videotoolbox") {
@@ -157,9 +170,21 @@ void VideoEncoderAsync::configureEncoderOptions(const std::string& encoderName, 
         }
     }
     else if (encoderName == "libx265") {
-        av_opt_set(codecCtx_->priv_data, "preset", isRealtime ? "ultrafast" : "medium", 0);
         if (isRealtime) {
+            av_opt_set(codecCtx_->priv_data, "preset", "ultrafast", 0);
             av_opt_set(codecCtx_->priv_data, "tune", "zerolatency", 0);
+        } else {
+            // OPTIMIZATION: Use faster presets for smaller resolutions
+            int pixels = width_ * height_;
+            const char* preset;
+            if (pixels <= 640 * 480) {
+                preset = "ultrafast";
+            } else if (pixels <= 1280 * 720) {
+                preset = "veryfast";
+            } else {
+                preset = "medium";
+            }
+            av_opt_set(codecCtx_->priv_data, "preset", preset, 0);
         }
     }
     else if (encoderName == "libaom-av1" || encoderName == "libsvtav1") {
