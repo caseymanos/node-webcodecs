@@ -580,12 +580,37 @@ void VideoEncoderAsync::ProcessEncode(EncodeJob& job) {
                 frame->data, frame->linesize
             );
         }
+        // Free source frame after conversion
+        av_frame_free(&srcFrame);
     } else {
-        av_frame_copy(frame, srcFrame);
+        // OPTIMIZATION: Use av_frame_ref for zero-copy when formats match exactly
+        // This just increments the reference count instead of copying data
+        av_frame_free(&frame);  // Free the pre-allocated frame
+        frame = av_frame_alloc();
+        if (!frame) {
+            av_frame_free(&srcFrame);
+            EncodeResult result;
+            result.isError = true;
+            result.errorMessage = "Failed to allocate frame for reference";
+            tsfnError_.BlockingCall(&result, [](Napi::Env env, Napi::Function fn, EncodeResult* res) {
+                fn.Call({ Napi::String::New(env, res->errorMessage) });
+            });
+            return;
+        }
+        int ref_ret = av_frame_ref(frame, srcFrame);
+        av_frame_free(&srcFrame);  // Free source after reference
+        if (ref_ret < 0) {
+            av_frame_free(&frame);
+            EncodeResult result;
+            result.isError = true;
+            result.errorMessage = "Failed to reference frame";
+            tsfnError_.BlockingCall(&result, [](Napi::Env env, Napi::Function fn, EncodeResult* res) {
+                fn.Call({ Napi::String::New(env, res->errorMessage) });
+            });
+            return;
+        }
+        frame->pts = job.timestamp;  // Set the timestamp on the referenced frame
     }
-
-    // Free source frame
-    av_frame_free(&srcFrame);
 
     // Set keyframe flag
     if (job.forceKeyframe) {

@@ -568,7 +568,23 @@ void VideoEncoderNative::Encode(const Napi::CallbackInfo& info) {
             frame->data, frame->linesize
         );
     } else {
-        av_frame_copy(frame, srcFrame);
+        // OPTIMIZATION: Use av_frame_ref for zero-copy when formats match exactly
+        // This just increments the reference count instead of copying data
+        av_frame_free(&frame);  // Free the pre-allocated frame
+        frame = av_frame_alloc();
+        if (!frame) {
+            Napi::Error::New(env, "Failed to allocate frame for reference").ThrowAsJavaScriptException();
+            return;
+        }
+        int ref_ret = av_frame_ref(frame, srcFrame);
+        if (ref_ret < 0) {
+            av_frame_free(&frame);
+            char errBuf[256];
+            av_strerror(ref_ret, errBuf, sizeof(errBuf));
+            Napi::Error::New(env, std::string("Failed to reference frame: ") + errBuf).ThrowAsJavaScriptException();
+            return;
+        }
+        frame->pts = timestamp;  // Set the timestamp on the referenced frame
     }
 
     // Set keyframe flag
