@@ -3,6 +3,7 @@
 Native WebCodecs API implementation for Node.js, using FFmpeg for encoding and decoding.
 
 [![npm version](https://badge.fury.io/js/node-webcodecs.svg)](https://www.npmjs.com/package/node-webcodecs)
+[![vjeux harness](https://img.shields.io/badge/vjeux%20harness-84%2F84%20passing-brightgreen)](https://github.com/vjeux/webcodecs-harness)
 
 ## Features
 
