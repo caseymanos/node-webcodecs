@@ -18,7 +18,7 @@ node-webcodecs brings the W3C WebCodecs API to Node.js and Bun, enabling frame-l
 
 ## Package Details
 
-- **Version**: 0.4.0
+- **Version**: 1.0.0
 - **Runtime Support**: Node.js 18+, Bun 1.0+
 - **Repository**: https://github.com/caseymanos/node-webcodecs
 - **npm**: https://www.npmjs.com/package/node-webcodecs

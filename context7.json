@@ -1,0 +1,41 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "node-webcodecs",
+  "description": "Native WebCodecs API for Node.js - video/audio encoding and decoding with FFmpeg and hardware acceleration",
+  "folders": [
+    "docs",
+    "examples",
+    "README.md",
+    "llms.txt",
+    "llms-full.txt"
+  ],
+  "excludeFolders": [
+    "node_modules",
+    "dist",
+    "build",
+    "prebuilds",
+    "native",
+    "test",
+    "coverage",
+    ".github"
+  ],
+  "excludeFiles": [
+    "CHANGELOG.md",
+    "LICENSE",
+    "package-lock.json",
+    "tsconfig.json",
+    "CMakeLists.txt",
+    "binding.gyp"
+  ],
+  "rules": [
+    "Always call frame.close() after using VideoFrame to prevent memory leaks",
+    "VideoFrame.copyTo() is async and must be awaited - it returns Promise<PlaneLayout[]>",
+    "EncodedVideoChunk.copyTo() and EncodedAudioChunk.copyTo() are synchronous",
+    "Use VideoEncoder.isConfigSupported() to check codec availability before configure()",
+    "Timestamps are in microseconds, not milliseconds (1 second = 1_000_000)",
+    "For 30fps video, use timestamp increments of 33333 microseconds",
+    "Hardware acceleration is available via hardwareAcceleration: 'prefer-hardware' config option",
+    "The codec string format follows W3C WebCodecs spec (e.g., 'avc1.42E01E' for H.264 Baseline)",
+    "Always await encoder.flush() before encoder.close() to ensure all frames are processed"
+  ]
+}
