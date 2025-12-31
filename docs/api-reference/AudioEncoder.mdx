@@ -1,324 +1,594 @@
 ---
 title: "AudioEncoder"
-description: "Encode AudioData objects into EncodedAudioChunk for AAC, Opus, and MP3"
+description: "Encode AudioData objects into EncodedAudioChunk for AAC, Opus, MP3, and more"
+icon: "microphone"
 ---
 
 # AudioEncoder
 
-## Classes
-
-### AudioEncoder
-
-Defined in: [AudioEncoder.ts:43](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L43)
-
-#### Constructors
-
-##### Constructor
-
-> **new AudioEncoder**(`init`): [`AudioEncoder`](#audioencoder)
-
-Defined in: [AudioEncoder.ts:60](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L60)
-
-###### Parameters
-
-###### init
-
-[`AudioEncoderInit`](#audioencoderinit)
-
-###### Returns
-
-[`AudioEncoder`](#audioencoder)
-
-#### Accessors
-
-##### state
-
-###### Get Signature
-
-> **get** **state**(): [`CodecState`](types.mdx#codecstate)
-
-Defined in: [AudioEncoder.ts:79](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L79)
-
-###### Returns
-
-[`CodecState`](types.mdx#codecstate)
-
-##### encodeQueueSize
-
-###### Get Signature
-
-> **get** **encodeQueueSize**(): `number`
-
-Defined in: [AudioEncoder.ts:83](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L83)
-
-###### Returns
-
-`number`
-
-#### Methods
-
-##### isConfigSupported()
-
-> `static` **isConfigSupported**(`config`): `Promise`\<[`AudioEncoderSupport`](#audioencodersupport)\>
-
-Defined in: [AudioEncoder.ts:53](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L53)
-
-###### Parameters
-
-###### config
-
-[`AudioEncoderConfig`](#audioencoderconfig)
-
-###### Returns
-
-`Promise`\<[`AudioEncoderSupport`](#audioencodersupport)\>
-
-##### addEventListener()
-
-> **addEventListener**(`type`, `listener`, `options?`): `void`
-
-Defined in: [AudioEncoder.ts:90](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L90)
-
-Minimal EventTarget-style API for 'dequeue' events, mirroring VideoEncoder.
-
-###### Parameters
-
-###### type
-
-`string`
-
-###### listener
-
-() => `void`
-
-###### options?
-
-###### once?
-
-`boolean`
-
-###### Returns
-
-`void`
-
-##### removeEventListener()
-
-> **removeEventListener**(`type`, `listener`): `void`
-
-Defined in: [AudioEncoder.ts:109](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L109)
-
-###### Parameters
-
-###### type
-
-`string`
-
-###### listener
-
-() => `void`
-
-###### Returns
-
-`void`
-
-##### configure()
-
-> **configure**(`config`): `void`
-
-Defined in: [AudioEncoder.ts:135](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L135)
-
-###### Parameters
-
-###### config
-
-[`AudioEncoderConfig`](#audioencoderconfig)
-
-###### Returns
-
-`void`
-
-##### encode()
-
-> **encode**(`data`): `void`
-
-Defined in: [AudioEncoder.ts:167](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L167)
-
-###### Parameters
-
-###### data
-
-[`AudioData`](AudioData.mdx#audiodata)
-
-###### Returns
-
-`void`
-
-##### flush()
-
-> **flush**(): `Promise`\<`void`\>
-
-Defined in: [AudioEncoder.ts:188](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L188)
-
-###### Returns
-
-`Promise`\<`void`\>
-
-##### reset()
-
-> **reset**(): `void`
-
-Defined in: [AudioEncoder.ts:204](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L204)
-
-###### Returns
-
-`void`
-
-##### close()
-
-> **close**(): `void`
-
-Defined in: [AudioEncoder.ts:218](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L218)
-
-###### Returns
-
-`void`
-
-## Interfaces
+The `AudioEncoder` class encodes raw `AudioData` objects into compressed `EncodedAudioChunk` objects. It supports common audio codecs like AAC, MP3, Opus, FLAC, and Vorbis through FFmpeg.
+
+<Info>
+This class follows the [W3C WebCodecs AudioEncoder specification](https://www.w3.org/TR/webcodecs/#audioencoder-interface).
+</Info>
+
+## Quick Example
+
+```typescript
+import { AudioEncoder, AudioData } from 'node-webcodecs';
+
+// Create an AAC encoder
+const encoder = new AudioEncoder({
+  output: (chunk, metadata) => {
+    console.log(`Encoded ${chunk.byteLength} bytes at ${chunk.timestamp}μs`);
+
+    // First chunk includes decoder config
+    if (metadata?.decoderConfig) {
+      console.log('Decoder config:', metadata.decoderConfig);
+    }
+  },
+  error: (err) => console.error('Encoding error:', err)
+});
+
+// Configure for AAC-LC at 128kbps
+encoder.configure({
+  codec: 'mp4a.40.2',      // AAC-LC
+  sampleRate: 48000,
+  numberOfChannels: 2,
+  bitrate: 128_000
+});
+
+// Create audio data from raw samples
+const audioData = new AudioData({
+  format: 'f32-planar',
+  sampleRate: 48000,
+  numberOfFrames: 1024,
+  numberOfChannels: 2,
+  timestamp: 0,
+  data: audioSamples
+});
+
+// Encode and close the source data
+encoder.encode(audioData);
+audioData.close();  // Important: prevent memory leaks
+
+// Wait for encoding to complete
+await encoder.flush();
+encoder.close();
+```
+
+<Warning>
+Always call `audioData.close()` after passing it to `encode()`. Failing to close AudioData objects will cause memory leaks as the underlying buffers are not automatically released.
+</Warning>
+
+---
+
+## Supported Audio Codecs
+
+| Codec | WebCodecs String | Typical Bitrate |
+|-------|------------------|-----------------|
+| AAC-LC | mp4a.40.2 | 128-256 kbps |
+| MP3 | mp3 | 128-320 kbps |
+| Opus | opus | 64-256 kbps |
+| FLAC | flac | Lossless |
+| Vorbis | vorbis | 128-320 kbps |
+
+---
+
+## Constructor
+
+Creates a new `AudioEncoder` with output and error callbacks.
+
+```typescript
+new AudioEncoder(init: AudioEncoderInit)
+```
+
+<ParamField body="init" type="AudioEncoderInit" required>
+  Initialization callbacks for the encoder.
+
+  <Expandable title="AudioEncoderInit properties">
+    <ParamField body="output" type="(chunk: EncodedAudioChunk, metadata?: AudioEncoderOutputMetadata) => void" required>
+      Callback invoked when an encoded audio chunk is ready. The first chunk typically
+      includes decoder configuration in the metadata.
+    </ParamField>
+
+    <ParamField body="error" type="(error: DOMException) => void" required>
+      Callback invoked when an encoding error occurs. The encoder transitions to
+      the `'closed'` state after an error.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+**Throws:** `TypeError` if callbacks are not functions.
+
+<Accordion title="Example: Creating an encoder">
+```typescript
+const encoder = new AudioEncoder({
+  output: (chunk, metadata) => {
+    // Handle encoded chunk
+    const data = new Uint8Array(chunk.byteLength);
+    chunk.copyTo(data);
+
+    // Check for decoder config (usually on first chunk)
+    if (metadata?.decoderConfig) {
+      console.log('Codec:', metadata.decoderConfig.codec);
+      console.log('Sample rate:', metadata.decoderConfig.sampleRate);
+      console.log('Channels:', metadata.decoderConfig.numberOfChannels);
+    }
+  },
+  error: (err) => {
+    console.error('Encoding failed:', err.message);
+  }
+});
+```
+</Accordion>
+
+---
+
+## Properties
+
+<ResponseField name="state" type="CodecState" required>
+  Current encoder state. One of:
+  - `'unconfigured'` - Not configured yet, or `reset()` was called
+  - `'configured'` - Ready to encode audio data
+  - `'closed'` - Encoder has been closed and cannot be used
+</ResponseField>
+
+<ResponseField name="encodeQueueSize" type="number" required>
+  Number of pending encode operations. Useful for backpressure management
+  when encoding large amounts of audio data.
+</ResponseField>
+
+---
+
+## Static Methods
+
+### isConfigSupported()
+
+Check if an audio encoder configuration is supported on this platform.
+
+```typescript
+static isConfigSupported(config: AudioEncoderConfig): Promise<AudioEncoderSupport>
+```
+
+<ParamField body="config" type="AudioEncoderConfig" required>
+  Configuration to test for support.
+</ParamField>
+
+**Returns:** `Promise<AudioEncoderSupport>` - Resolves with support status and normalized config.
+
+<Accordion title="Example: Checking codec support">
+```typescript
+const aacSupport = await AudioEncoder.isConfigSupported({
+  codec: 'mp4a.40.2',
+  sampleRate: 48000,
+  numberOfChannels: 2,
+  bitrate: 128_000
+});
+
+if (aacSupport.supported) {
+  console.log('AAC encoding is supported');
+  encoder.configure(aacSupport.config);
+} else {
+  console.log('AAC encoding is NOT supported');
+}
+```
+</Accordion>
+
+<Accordion title="Example: Fallback codec selection">
+```typescript
+// Try preferred codecs in order
+const codecs = ['mp4a.40.2', 'opus', 'mp3'];
+
+for (const codec of codecs) {
+  const support = await AudioEncoder.isConfigSupported({
+    codec,
+    sampleRate: 48000,
+    numberOfChannels: 2,
+    bitrate: 128_000
+  });
+
+  if (support.supported) {
+    console.log(`Using codec: ${codec}`);
+    encoder.configure(support.config);
+    break;
+  }
+}
+```
+</Accordion>
+
+---
+
+## Instance Methods
+
+### configure()
+
+Configure the encoder with codec parameters. Must be called before encoding.
+
+```typescript
+configure(config: AudioEncoderConfig): void
+```
+
+<ParamField body="config" type="AudioEncoderConfig" required>
+  Encoder configuration specifying codec and audio parameters.
+
+  <Expandable title="AudioEncoderConfig properties">
+    <ParamField body="codec" type="string" required>
+      Audio codec string. Common values:
+      - `'mp4a.40.2'` - AAC-LC (most compatible)
+      - `'opus'` - Opus (best quality/size ratio)
+      - `'mp3'` - MP3 (legacy compatibility)
+      - `'flac'` - FLAC (lossless)
+      - `'vorbis'` - Vorbis (open source)
+    </ParamField>
+
+    <ParamField body="sampleRate" type="number" required>
+      Sample rate in Hz. Common values: 44100, 48000, 96000.
+    </ParamField>
+
+    <ParamField body="numberOfChannels" type="number" required>
+      Number of audio channels. Typically 1 (mono) or 2 (stereo).
+    </ParamField>
+
+    <ParamField body="bitrate" type="number">
+      Target bitrate in bits per second. For example, `128_000` for 128 kbps.
+      Not used for lossless codecs like FLAC.
+    </ParamField>
+
+    <ParamField body="bitrateMode" type="AudioBitrateMode">
+      Bitrate control mode:
+      - `'constant'` - Constant bitrate (CBR)
+      - `'variable'` - Variable bitrate (VBR, default)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+**Throws:**
+- `InvalidStateError` if encoder is closed
+- `NotSupportedError` if codec is not supported
+
+<Accordion title="Example: Configuring for AAC">
+```typescript
+encoder.configure({
+  codec: 'mp4a.40.2',
+  sampleRate: 48000,
+  numberOfChannels: 2,
+  bitrate: 256_000,
+  bitrateMode: 'variable'
+});
+```
+</Accordion>
+
+<Accordion title="Example: Configuring for Opus">
+```typescript
+encoder.configure({
+  codec: 'opus',
+  sampleRate: 48000,
+  numberOfChannels: 2,
+  bitrate: 96_000  // Opus is very efficient
+});
+```
+</Accordion>
+
+---
+
+### encode()
+
+Queue an `AudioData` object for encoding.
+
+```typescript
+encode(data: AudioData): void
+```
+
+<ParamField body="data" type="AudioData" required>
+  The raw audio data to encode. Must have a valid format and timestamp.
+</ParamField>
+
+**Throws:**
+- `InvalidStateError` if encoder is not configured
+- `TypeError` if data is invalid
+
+<Warning>
+Always call `audioData.close()` after encoding to prevent memory leaks. The encoder makes an internal copy of the data, so closing the source is safe.
+</Warning>
+
+<Accordion title="Example: Encoding audio frames">
+```typescript
+// Encode multiple audio frames
+for (let i = 0; i < audioFrames.length; i++) {
+  const audioData = new AudioData({
+    format: 'f32-planar',
+    sampleRate: 48000,
+    numberOfFrames: 1024,
+    numberOfChannels: 2,
+    timestamp: i * 21333,  // ~21ms per AAC frame
+    data: audioFrames[i]
+  });
+
+  encoder.encode(audioData);
+  audioData.close();  // Always close after encode
+}
+```
+</Accordion>
+
+<Accordion title="Example: Backpressure handling">
+```typescript
+for (const samples of audioSamples) {
+  const audioData = new AudioData({
+    format: 'f32-planar',
+    sampleRate: 48000,
+    numberOfFrames: 1024,
+    numberOfChannels: 2,
+    timestamp,
+    data: samples
+  });
+
+  encoder.encode(audioData);
+  audioData.close();
+
+  // Wait if queue gets too large
+  if (encoder.encodeQueueSize > 10) {
+    await new Promise(resolve => {
+      encoder.addEventListener('dequeue', resolve, { once: true });
+    });
+  }
+}
+```
+</Accordion>
+
+---
+
+### addEventListener()
+
+Add an event listener for encoder events.
+
+```typescript
+addEventListener(type: string, listener: () => void, options?: { once?: boolean }): void
+```
+
+<ParamField body="type" type="string" required>
+  Event type. Currently supports `'dequeue'` which fires when the encode queue size decreases.
+</ParamField>
+
+<ParamField body="listener" type="() => void" required>
+  Callback function to invoke when the event fires.
+</ParamField>
+
+<ParamField body="options" type="object">
+  Event listener options.
+
+  <Expandable title="Options">
+    <ParamField body="once" type="boolean">
+      If `true`, the listener is automatically removed after being invoked once.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<Accordion title="Example: Listening for dequeue events">
+```typescript
+// Monitor queue size
+encoder.addEventListener('dequeue', () => {
+  console.log('Queue size:', encoder.encodeQueueSize);
+});
+
+// One-time listener for flow control
+await new Promise(resolve => {
+  encoder.addEventListener('dequeue', resolve, { once: true });
+});
+```
+</Accordion>
+
+---
+
+### removeEventListener()
+
+Remove a previously added event listener.
+
+```typescript
+removeEventListener(type: string, listener: () => void): void
+```
+
+<ParamField body="type" type="string" required>
+  Event type (e.g., `'dequeue'`).
+</ParamField>
+
+<ParamField body="listener" type="() => void" required>
+  The callback function to remove. Must be the same function reference that was added.
+</ParamField>
+
+<Accordion title="Example: Removing a listener">
+```typescript
+const onDequeue = () => {
+  console.log('Dequeue event fired');
+};
+
+encoder.addEventListener('dequeue', onDequeue);
+
+// Later, remove the listener
+encoder.removeEventListener('dequeue', onDequeue);
+```
+</Accordion>
+
+---
+
+### flush()
+
+Wait for all pending encode operations to complete.
+
+```typescript
+flush(): Promise<void>
+```
+
+**Returns:** `Promise<void>` - Resolves when all queued audio data has been encoded.
+
+**Throws:**
+- `InvalidStateError` if encoder is not configured
+- Rejects if encoding fails
+
+<Accordion title="Example: Flushing the encoder">
+```typescript
+// Encode all audio data
+for (const frame of audioFrames) {
+  encoder.encode(frame);
+  frame.close();
+}
+
+// Wait for all encoding to complete
+await encoder.flush();
+console.log('All audio encoded!');
+
+// Now safe to close
+encoder.close();
+```
+</Accordion>
+
+---
+
+### reset()
+
+Reset the encoder to the unconfigured state.
+
+```typescript
+reset(): void
+```
+
+Aborts all pending encode operations and resets to the `'unconfigured'` state.
+You must call `configure()` again before encoding more audio.
+
+**Throws:** `InvalidStateError` if encoder is closed
+
+<Accordion title="Example: Resetting and reconfiguring">
+```typescript
+encoder.configure({
+  codec: 'mp4a.40.2',
+  sampleRate: 48000,
+  numberOfChannels: 2
+});
+
+encoder.encode(audioData);
+
+// Abort and reconfigure with different settings
+encoder.reset();
+
+encoder.configure({
+  codec: 'opus',
+  sampleRate: 48000,
+  numberOfChannels: 2
+});
+```
+</Accordion>
+
+---
+
+### close()
+
+Close the encoder and release all resources.
+
+```typescript
+close(): void
+```
+
+The encoder cannot be used after calling `close()`. Any pending encode operations
+are aborted and the state transitions to `'closed'`.
+
+<Accordion title="Example: Proper cleanup">
+```typescript
+// Encode all audio
+for (const frame of audioFrames) {
+  encoder.encode(frame);
+  frame.close();
+}
+
+// Wait for encoding to complete
+await encoder.flush();
+
+// Release resources
+encoder.close();
+
+// encoder.encode() will now throw InvalidStateError
+```
+</Accordion>
+
+---
+
+## Type Definitions
 
 ### AudioEncoderConfig
 
-Defined in: [AudioEncoder.ts:13](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L13)
+Configuration options for the audio encoder.
 
-#### Properties
-
-##### codec
-
-> **codec**: `string`
-
-Defined in: [AudioEncoder.ts:14](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L14)
-
-##### sampleRate
-
-> **sampleRate**: `number`
-
-Defined in: [AudioEncoder.ts:15](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L15)
-
-##### numberOfChannels
-
-> **numberOfChannels**: `number`
-
-Defined in: [AudioEncoder.ts:16](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L16)
-
-##### bitrate?
-
-> `optional` **bitrate**: `number`
-
-Defined in: [AudioEncoder.ts:17](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L17)
-
-##### bitrateMode?
-
-> `optional` **bitrateMode**: [`AudioBitrateMode`](#audiobitratemode)
-
-Defined in: [AudioEncoder.ts:18](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L18)
-
-***
+```typescript
+interface AudioEncoderConfig {
+  codec: string;                     // Required: codec identifier
+  sampleRate: number;                // Required: sample rate in Hz
+  numberOfChannels: number;          // Required: channel count
+  bitrate?: number;                  // Optional: target bitrate (bps)
+  bitrateMode?: AudioBitrateMode;    // Optional: 'constant' | 'variable'
+}
+```
 
 ### AudioEncoderInit
 
-Defined in: [AudioEncoder.ts:21](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L21)
+Initialization callbacks for creating an AudioEncoder.
 
-#### Properties
-
-##### output()
-
-> **output**: (`chunk`, `metadata?`) => `void`
-
-Defined in: [AudioEncoder.ts:22](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L22)
-
-###### Parameters
-
-###### chunk
-
-[`EncodedAudioChunk`](EncodedAudioChunk.mdx#encodedaudiochunk)
-
-###### metadata?
-
-[`AudioEncoderOutputMetadata`](#audioencoderoutputmetadata)
-
-###### Returns
-
-`void`
-
-##### error()
-
-> **error**: (`error`) => `void`
-
-Defined in: [AudioEncoder.ts:23](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L23)
-
-###### Parameters
-
-###### error
-
-[`WebCodecsDOMException`](types.mdx#webcodecsdomexception)
-
-###### Returns
-
-`void`
-
-***
+```typescript
+interface AudioEncoderInit {
+  output: (chunk: EncodedAudioChunk, metadata?: AudioEncoderOutputMetadata) => void;
+  error: (error: DOMException) => void;
+}
+```
 
 ### AudioEncoderOutputMetadata
 
-Defined in: [AudioEncoder.ts:26](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L26)
+Metadata provided with encoded audio chunks.
 
-#### Properties
-
-##### decoderConfig?
-
-> `optional` **decoderConfig**: `object`
-
-Defined in: [AudioEncoder.ts:27](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L27)
-
-###### codec
-
-> **codec**: `string`
-
-###### sampleRate
-
-> **sampleRate**: `number`
-
-###### numberOfChannels
-
-> **numberOfChannels**: `number`
-
-###### description?
-
-> `optional` **description**: `ArrayBuffer`
-
-***
+```typescript
+interface AudioEncoderOutputMetadata {
+  decoderConfig?: {
+    codec: string;              // Codec string for decoder
+    sampleRate: number;         // Sample rate in Hz
+    numberOfChannels: number;   // Channel count
+    description?: ArrayBuffer;  // Codec-specific data (e.g., AudioSpecificConfig)
+  };
+}
+```
 
 ### AudioEncoderSupport
 
-Defined in: [AudioEncoder.ts:35](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L35)
+Result from `isConfigSupported()` indicating codec support.
 
-#### Properties
-
-##### supported
-
-> **supported**: `boolean`
-
-Defined in: [AudioEncoder.ts:36](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L36)
-
-##### config
-
-> **config**: [`AudioEncoderConfig`](#audioencoderconfig)
-
-Defined in: [AudioEncoder.ts:37](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L37)
-
-## Type Aliases
+```typescript
+interface AudioEncoderSupport {
+  supported: boolean;           // Whether the config is supported
+  config: AudioEncoderConfig;   // The tested (possibly normalized) config
+}
+```
 
 ### AudioBitrateMode
 
-> **AudioBitrateMode** = `"constant"` \| `"variable"`
+Bitrate control mode for audio encoding.
 
-Defined in: [AudioEncoder.ts:11](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioEncoder.ts#L11)
+```typescript
+type AudioBitrateMode = 'constant' | 'variable';
+```
+
+| Value | Description |
+|-------|-------------|
+| `'constant'` | Constant bitrate (CBR) - consistent file size, may waste bits on silence |
+| `'variable'` | Variable bitrate (VBR) - better quality/size ratio, recommended for most uses |
+
+---
+
+## See Also
+
+<CardGroup cols={3}>
+  <Card title="AudioData" icon="waveform" href="/api-reference/AudioData">
+    Raw audio sample data for encoding
+  </Card>
+  <Card title="AudioDecoder" icon="volume-high" href="/api-reference/AudioDecoder">
+    Decode EncodedAudioChunks back to AudioData
+  </Card>
+  <Card title="EncodedAudioChunk" icon="music" href="/api-reference/EncodedAudioChunk">
+    Encoded audio chunk output
+  </Card>
+</CardGroup>

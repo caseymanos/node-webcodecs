@@ -1,127 +1,435 @@
 ---
 title: "VideoColorSpace"
-description: "Describes video color space including primaries, transfer, and matrix"
+description: "Describes video color space including primaries, transfer function, and matrix coefficients"
+icon: "palette"
 ---
 
 # VideoColorSpace
 
-## Classes
+The `VideoColorSpace` class describes the color representation of video content. It specifies how color values should be interpreted, including the color gamut (primaries), brightness encoding (transfer), and YUV conversion (matrix).
 
-### VideoColorSpace
+<Info>
+This class follows the [W3C WebCodecs VideoColorSpace specification](https://www.w3.org/TR/webcodecs/#videocolorspace-interface).
+</Info>
 
-Defined in: [VideoColorSpace.ts:35](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L35)
+## Quick Example
 
-#### Constructors
+<CodeGroup>
+```typescript SDR (BT.709)
+import { VideoColorSpace } from 'node-webcodecs';
 
-##### Constructor
+// Standard Dynamic Range - web video, HD content
+const sdrColorSpace = new VideoColorSpace({
+  primaries: 'bt709',      // Standard HD color gamut
+  transfer: 'bt709',       // SDR gamma curve
+  matrix: 'bt709',         // BT.709 YUV conversion
+  fullRange: false         // Limited range (16-235)
+});
 
-> **new VideoColorSpace**(`init?`): [`VideoColorSpace`](#videocolorspace)
+console.log(sdrColorSpace.primaries);  // 'bt709'
+console.log(sdrColorSpace.toJSON());   // Returns VideoColorSpaceInit object
+```
 
-Defined in: [VideoColorSpace.ts:41](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L41)
+```typescript HDR10 (BT.2020 + PQ)
+import { VideoColorSpace } from 'node-webcodecs';
 
-###### Parameters
+// High Dynamic Range - HDR10, 4K/8K content
+const hdrColorSpace = new VideoColorSpace({
+  primaries: 'bt2020',     // Wide color gamut
+  transfer: 'pq',          // HDR10 Perceptual Quantizer
+  matrix: 'bt2020-ncl',    // BT.2020 non-constant luminance
+  fullRange: false         // Limited range
+});
 
-###### init?
+console.log(hdrColorSpace.transfer);  // 'pq'
+```
 
-[`VideoColorSpaceInit`](#videocolorspaceinit)
+```typescript HLG Broadcast
+import { VideoColorSpace } from 'node-webcodecs';
 
-###### Returns
+// Hybrid Log-Gamma - broadcast HDR
+const hlgColorSpace = new VideoColorSpace({
+  primaries: 'bt2020',     // Wide color gamut
+  transfer: 'hlg',         // HLG transfer (backward compatible)
+  matrix: 'bt2020-ncl',    // BT.2020 matrix
+  fullRange: false
+});
+```
+</CodeGroup>
 
-[`VideoColorSpace`](#videocolorspace)
+---
 
-#### Properties
+## Constructor
 
-##### primaries
+Creates a new `VideoColorSpace` from initialization data.
 
-> `readonly` **primaries**: [`VideoColorPrimaries`](#videocolorprimaries) \| `null`
+```typescript
+new VideoColorSpace(init?: VideoColorSpaceInit)
+```
 
-Defined in: [VideoColorSpace.ts:36](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L36)
+<ParamField body="init" type="VideoColorSpaceInit">
+  Optional configuration object for the color space.
 
-##### transfer
+  <Expandable title="VideoColorSpaceInit properties">
+    <ParamField body="primaries" type="VideoColorPrimaries | null">
+      Color primaries defining the color gamut (range of reproducible colors).
+      See [Color Primaries](#color-primaries) table below.
+    </ParamField>
 
-> `readonly` **transfer**: [`VideoTransferCharacteristics`](#videotransfercharacteristics) \| `null`
+    <ParamField body="transfer" type="VideoTransferCharacteristics | null">
+      Transfer function defining how brightness values are encoded.
+      See [Transfer Characteristics](#transfer-characteristics) table below.
+    </ParamField>
 
-Defined in: [VideoColorSpace.ts:37](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L37)
+    <ParamField body="matrix" type="VideoMatrixCoefficients | null">
+      Matrix coefficients for RGB to YUV conversion.
+      See [Matrix Coefficients](#matrix-coefficients) table below.
+    </ParamField>
 
-##### matrix
+    <ParamField body="fullRange" type="boolean | null">
+      Whether to use full range (0-255) or limited range (16-235) for video levels.
+      - `true` - Full range (0-255), used for computer graphics
+      - `false` - Limited range (16-235), standard for broadcast video
+    </ParamField>
+  </Expandable>
+</ParamField>
 
-> `readonly` **matrix**: [`VideoMatrixCoefficients`](#videomatrixcoefficients) \| `null`
+---
 
-Defined in: [VideoColorSpace.ts:38](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L38)
+## Properties
 
-##### fullRange
+All properties are **readonly** after construction.
 
-> `readonly` **fullRange**: `boolean` \| `null`
+<ResponseField name="primaries" type="VideoColorPrimaries | null" required>
+  The color primaries defining the color gamut. Returns `null` if not specified.
+</ResponseField>
 
-Defined in: [VideoColorSpace.ts:39](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L39)
+<ResponseField name="transfer" type="VideoTransferCharacteristics | null" required>
+  The transfer characteristics (gamma/EOTF) for brightness encoding. Returns `null` if not specified.
+</ResponseField>
 
-#### Methods
+<ResponseField name="matrix" type="VideoMatrixCoefficients | null" required>
+  The matrix coefficients for RGB-to-YUV conversion. Returns `null` if not specified.
+</ResponseField>
 
-##### toJSON()
+<ResponseField name="fullRange" type="boolean | null" required>
+  Whether full range (0-255) or limited range (16-235) is used. Returns `null` if not specified.
+</ResponseField>
 
-> **toJSON**(): [`VideoColorSpaceInit`](#videocolorspaceinit)
+---
 
-Defined in: [VideoColorSpace.ts:48](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L48)
+## Methods
 
-###### Returns
+### toJSON()
 
-[`VideoColorSpaceInit`](#videocolorspaceinit)
+Returns a plain object representation of the color space, suitable for serialization.
 
-## Interfaces
+```typescript
+colorSpace.toJSON(): VideoColorSpaceInit
+```
 
-### VideoColorSpaceInit
+**Returns:** A `VideoColorSpaceInit` object containing all color space properties.
 
-Defined in: [VideoColorSpace.ts:28](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L28)
+<Accordion title="Example: Serializing color space">
+```typescript
+const colorSpace = new VideoColorSpace({
+  primaries: 'bt2020',
+  transfer: 'pq',
+  matrix: 'bt2020-ncl',
+  fullRange: false
+});
 
-#### Properties
+const json = colorSpace.toJSON();
+// {
+//   primaries: 'bt2020',
+//   transfer: 'pq',
+//   matrix: 'bt2020-ncl',
+//   fullRange: false
+// }
 
-##### primaries?
+// Use for VideoFrame or encoder configuration
+const frame = new VideoFrame(data, {
+  format: 'RGBA',
+  codedWidth: 1920,
+  codedHeight: 1080,
+  timestamp: 0,
+  colorSpace: colorSpace.toJSON()
+});
+```
+</Accordion>
 
-> `optional` **primaries**: [`VideoColorPrimaries`](#videocolorprimaries) \| `null`
+---
 
-Defined in: [VideoColorSpace.ts:29](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L29)
+## Color Primaries
 
-##### transfer?
+Color primaries define the color gamut (range of colors) that can be represented.
 
-> `optional` **transfer**: [`VideoTransferCharacteristics`](#videotransfercharacteristics) \| `null`
+| Primary | Description | Use Case |
+|---------|-------------|----------|
+| `bt709` | BT.709 (Rec. 709) | SDR, HD video, web video |
+| `bt2020` | BT.2020 (Rec. 2020) | HDR, 4K/8K, wide color gamut |
+| `smpte432` | DCI-P3 | Digital cinema, Apple displays |
+| `bt470bg` | BT.470 BG | Legacy PAL/SECAM |
+| `smpte170m` | SMPTE 170M | Legacy NTSC |
 
-Defined in: [VideoColorSpace.ts:30](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L30)
+<AccordionGroup>
+  <Accordion title="BT.709 - Standard Definition">
+    The standard for HD television and web video. Covers approximately 35% of visible colors.
+    This is the default for most SDR content and should be used for web distribution.
+  </Accordion>
 
-##### matrix?
+  <Accordion title="BT.2020 - Wide Color Gamut">
+    The standard for HDR and UHD content. Covers approximately 75% of visible colors.
+    Required for HDR10 and HLG content. Use with `pq` or `hlg` transfer functions.
+  </Accordion>
 
-> `optional` **matrix**: [`VideoMatrixCoefficients`](#videomatrixcoefficients) \| `null`
+  <Accordion title="DCI-P3 - Digital Cinema">
+    Used in digital cinema projection and Apple displays. Covers approximately 45% of visible colors.
+    A middle ground between BT.709 and BT.2020.
+  </Accordion>
+</AccordionGroup>
 
-Defined in: [VideoColorSpace.ts:31](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L31)
+---
 
-##### fullRange?
+## Transfer Characteristics
 
-> `optional` **fullRange**: `boolean` \| `null`
+Transfer characteristics (also called EOTF - Electro-Optical Transfer Function) define how brightness values are encoded.
 
-Defined in: [VideoColorSpace.ts:32](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L32)
+| Transfer | Description |
+|----------|-------------|
+| `bt709` | SDR gamma curve (~2.4) |
+| `pq` | HDR10 Perceptual Quantizer (ST.2084) |
+| `hlg` | Hybrid Log-Gamma for broadcast HDR |
+| `linear` | Linear light (no gamma) |
+| `iec61966-2-1` | sRGB (~2.2 gamma) |
+| `smpte170m` | SMPTE 170M (NTSC gamma) |
 
-## Type Aliases
+<AccordionGroup>
+  <Accordion title="BT.709 - SDR Standard">
+    The standard gamma curve for SDR content. Uses approximately 2.4 gamma with a linear segment near black.
+    Use for all standard web and broadcast video.
+  </Accordion>
+
+  <Accordion title="PQ (Perceptual Quantizer) - HDR10">
+    The transfer function for HDR10 content (SMPTE ST.2084). Encodes absolute brightness up to 10,000 nits.
+    Provides the best HDR quality but requires display calibration. Most common HDR format.
+  </Accordion>
+
+  <Accordion title="HLG (Hybrid Log-Gamma) - Broadcast HDR">
+    A relative brightness encoding that is backward-compatible with SDR displays.
+    Used primarily in broadcast (BBC, NHK). Simpler than PQ and degrades gracefully on SDR displays.
+  </Accordion>
+
+  <Accordion title="Linear - Raw Light Values">
+    No gamma correction applied. Values represent linear light intensity.
+    Used for compositing and color grading workflows, not for display.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Matrix Coefficients
+
+Matrix coefficients define how RGB values are converted to/from YUV color space.
+
+| Matrix | Description | Use Case |
+|--------|-------------|----------|
+| `rgb` | No conversion (RGB) | RGB-only formats |
+| `bt709` | BT.709 coefficients | SDR HD video |
+| `bt2020-ncl` | BT.2020 non-constant luminance | HDR video |
+| `bt470bg` | BT.470 BG | Legacy PAL |
+| `smpte170m` | SMPTE 170M | Legacy NTSC |
+
+<Note>
+For HDR content, always use `bt2020-ncl` (non-constant luminance). The `bt2020-cl` (constant luminance) variant exists but is rarely used in practice.
+</Note>
+
+---
+
+## Common Presets
+
+### BT.709 SDR (Standard Web Video)
+
+```typescript
+const bt709SDR = new VideoColorSpace({
+  primaries: 'bt709',
+  transfer: 'bt709',
+  matrix: 'bt709',
+  fullRange: false
+});
+```
+
+Use for: HD video, web streaming, YouTube, social media.
+
+### BT.2020 HDR10
+
+```typescript
+const bt2020HDR10 = new VideoColorSpace({
+  primaries: 'bt2020',
+  transfer: 'pq',
+  matrix: 'bt2020-ncl',
+  fullRange: false
+});
+```
+
+Use for: 4K HDR content, Netflix, Apple TV+, streaming HDR.
+
+### BT.2020 HLG
+
+```typescript
+const bt2020HLG = new VideoColorSpace({
+  primaries: 'bt2020',
+  transfer: 'hlg',
+  matrix: 'bt2020-ncl',
+  fullRange: false
+});
+```
+
+Use for: Broadcast HDR, live TV, SDR-compatible HDR.
+
+### DCI-P3 (Apple Devices)
+
+```typescript
+const dciP3 = new VideoColorSpace({
+  primaries: 'smpte432',
+  transfer: 'iec61966-2-1',  // sRGB
+  matrix: 'bt709',
+  fullRange: false
+});
+```
+
+Use for: Apple displays, wide-gamut SDR content.
+
+### Full Range RGB (Computer Graphics)
+
+```typescript
+const fullRangeRGB = new VideoColorSpace({
+  primaries: 'bt709',
+  transfer: 'iec61966-2-1',
+  matrix: 'rgb',
+  fullRange: true
+});
+```
+
+Use for: Screen capture, computer graphics, game footage.
+
+---
+
+## VideoColorSpaceInit Interface
+
+The initialization object used to construct a `VideoColorSpace`.
+
+```typescript
+interface VideoColorSpaceInit {
+  primaries?: VideoColorPrimaries | null;
+  transfer?: VideoTransferCharacteristics | null;
+  matrix?: VideoMatrixCoefficients | null;
+  fullRange?: boolean | null;
+}
+```
+
+All properties are optional. Unspecified properties default to `null`, meaning the value is unknown or unspecified.
+
+---
+
+## Type Definitions
 
 ### VideoColorPrimaries
 
-> **VideoColorPrimaries** = `"bt709"` \| `"bt470bg"` \| `"smpte170m"` \| `"bt2020"` \| `"smpte432"`
-
-Defined in: [VideoColorSpace.ts:6](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L6)
-
-VideoColorSpace - Describes the color space of a video frame
-Implements the W3C WebCodecs VideoColorSpace interface
-
-***
+```typescript
+type VideoColorPrimaries =
+  | 'bt709'      // BT.709 (SDR)
+  | 'bt470bg'    // BT.470 BG (PAL)
+  | 'smpte170m'  // SMPTE 170M (NTSC)
+  | 'bt2020'     // BT.2020 (HDR)
+  | 'smpte432';  // DCI-P3
+```
 
 ### VideoTransferCharacteristics
 
-> **VideoTransferCharacteristics** = `"bt709"` \| `"smpte170m"` \| `"iec61966-2-1"` \| `"linear"` \| `"pq"` \| `"hlg"`
-
-Defined in: [VideoColorSpace.ts:13](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L13)
-
-***
+```typescript
+type VideoTransferCharacteristics =
+  | 'bt709'          // SDR gamma
+  | 'smpte170m'      // NTSC gamma
+  | 'iec61966-2-1'   // sRGB
+  | 'linear'         // Linear light
+  | 'pq'             // HDR10 (ST.2084)
+  | 'hlg';           // HLG
+```
 
 ### VideoMatrixCoefficients
 
-> **VideoMatrixCoefficients** = `"rgb"` \| `"bt709"` \| `"bt470bg"` \| `"smpte170m"` \| `"bt2020-ncl"`
+```typescript
+type VideoMatrixCoefficients =
+  | 'rgb'         // No conversion
+  | 'bt709'       // BT.709
+  | 'bt470bg'     // BT.470 BG
+  | 'smpte170m'   // SMPTE 170M
+  | 'bt2020-ncl'; // BT.2020 non-constant luminance
+```
 
-Defined in: [VideoColorSpace.ts:21](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoColorSpace.ts#L21)
+---
+
+## Usage with VideoEncoder
+
+Specify color space when encoding to ensure proper metadata in the output:
+
+```typescript
+import { VideoEncoder, VideoFrame, VideoColorSpace } from 'node-webcodecs';
+
+const encoder = new VideoEncoder({
+  output: (chunk, metadata) => {
+    console.log(`Encoded ${chunk.byteLength} bytes`);
+  },
+  error: (e) => console.error(e)
+});
+
+// Configure encoder with HDR color space
+encoder.configure({
+  codec: 'hevc_videotoolbox',
+  width: 3840,
+  height: 2160,
+  bitrate: 25_000_000,
+  colorSpace: {
+    primaries: 'bt2020',
+    transfer: 'pq',
+    matrix: 'bt2020-ncl',
+    fullRange: false
+  }
+});
+
+// Create frame with matching color space
+const frame = new VideoFrame(hdrData, {
+  format: 'RGBA',
+  codedWidth: 3840,
+  codedHeight: 2160,
+  timestamp: 0,
+  colorSpace: {
+    primaries: 'bt2020',
+    transfer: 'pq',
+    matrix: 'bt2020-ncl'
+  }
+});
+
+encoder.encode(frame, { keyFrame: true });
+frame.close();
+```
+
+---
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="VideoFrame" icon="image" href="/api-reference/VideoFrame">
+    Raw video frame with color space metadata
+  </Card>
+  <Card title="VideoEncoder" icon="video" href="/api-reference/VideoEncoder">
+    Encode frames with color space configuration
+  </Card>
+  <Card title="HDR Encoding Guide" icon="sun" href="/guides/hdr-encoding">
+    Complete guide to HDR video encoding
+  </Card>
+  <Card title="VideoDecoder" icon="film" href="/api-reference/VideoDecoder">
+    Decode video with color space preservation
+  </Card>
+</CardGroup>

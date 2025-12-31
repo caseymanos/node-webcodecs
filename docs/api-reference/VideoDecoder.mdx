@@ -1,332 +1,637 @@
 ---
 title: "VideoDecoder"
 description: "Decode EncodedVideoChunk objects into VideoFrame for playback and processing"
+icon: "film"
 ---
 
 # VideoDecoder
 
-## Classes
-
-### VideoDecoder
-
-Defined in: [VideoDecoder.ts:46](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L46)
-
-#### Constructors
-
-##### Constructor
-
-> **new VideoDecoder**(`init`): [`VideoDecoder`](#videodecoder)
-
-Defined in: [VideoDecoder.ts:92](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L92)
-
-###### Parameters
-
-###### init
-
-[`VideoDecoderInit`](#videodecoderinit)
-
-###### Returns
-
-[`VideoDecoder`](#videodecoder)
-
-#### Accessors
-
-##### state
-
-###### Get Signature
-
-> **get** **state**(): [`CodecState`](types.mdx#codecstate)
-
-Defined in: [VideoDecoder.ts:106](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L106)
-
-###### Returns
-
-[`CodecState`](types.mdx#codecstate)
-
-##### decodeQueueSize
-
-###### Get Signature
-
-> **get** **decodeQueueSize**(): `number`
-
-Defined in: [VideoDecoder.ts:110](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L110)
-
-###### Returns
-
-`number`
-
-#### Methods
-
-##### isConfigSupported()
-
-> `static` **isConfigSupported**(`config`): `Promise`\<[`VideoDecoderSupport`](#videodecodersupport)\>
-
-Defined in: [VideoDecoder.ts:57](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L57)
-
-###### Parameters
-
-###### config
-
-[`VideoDecoderConfig`](#videodecoderconfig)
-
-###### Returns
-
-`Promise`\<[`VideoDecoderSupport`](#videodecodersupport)\>
-
-##### addEventListener()
-
-> **addEventListener**(`type`, `listener`, `options?`): `void`
-
-Defined in: [VideoDecoder.ts:118](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L118)
-
-Minimal EventTarget-style API for 'dequeue' events.
-Enables compatibility with MediaBunny and browser WebCodecs code.
-
-###### Parameters
-
-###### type
-
-`string`
-
-###### listener
-
-() => `void`
-
-###### options?
-
-###### once?
-
-`boolean`
-
-###### Returns
-
-`void`
-
-##### removeEventListener()
-
-> **removeEventListener**(`type`, `listener`): `void`
-
-Defined in: [VideoDecoder.ts:137](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L137)
-
-###### Parameters
-
-###### type
-
-`string`
-
-###### listener
-
-() => `void`
-
-###### Returns
-
-`void`
-
-##### configure()
-
-> **configure**(`config`): `void`
-
-Defined in: [VideoDecoder.ts:163](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L163)
-
-###### Parameters
-
-###### config
-
-[`VideoDecoderConfig`](#videodecoderconfig)
-
-###### Returns
-
-`void`
-
-##### decode()
-
-> **decode**(`chunk`): `void`
-
-Defined in: [VideoDecoder.ts:231](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L231)
-
-###### Parameters
-
-###### chunk
-
-[`EncodedVideoChunk`](EncodedVideoChunk.mdx#encodedvideochunk)
-
-###### Returns
-
-`void`
-
-##### flush()
-
-> **flush**(): `Promise`\<`void`\>
-
-Defined in: [VideoDecoder.ts:248](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L248)
-
-###### Returns
-
-`Promise`\<`void`\>
-
-##### reset()
-
-> **reset**(): `void`
-
-Defined in: [VideoDecoder.ts:264](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L264)
-
-###### Returns
-
-`void`
-
-##### close()
-
-> **close**(): `void`
-
-Defined in: [VideoDecoder.ts:277](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L277)
-
-###### Returns
-
-`void`
+The `VideoDecoder` class decodes compressed video data (`EncodedVideoChunk`) into raw video frames (`VideoFrame`). It supports H.264, VP8, VP9, HEVC, and AV1 codecs with optional hardware acceleration.
+
+<Info>
+This class follows the [W3C WebCodecs VideoDecoder specification](https://www.w3.org/TR/webcodecs/#videodecoder-interface).
+</Info>
+
+## Quick Example
+
+```typescript
+import { VideoDecoder, EncodedVideoChunk } from 'node-webcodecs';
+
+// Create decoder with output and error callbacks
+const decoder = new VideoDecoder({
+  output: (frame) => {
+    console.log(`Decoded frame: ${frame.codedWidth}x${frame.codedHeight}`);
+    console.log(`Timestamp: ${frame.timestamp}μs`);
+
+    // Process the frame (display, save, re-encode, etc.)
+    processFrame(frame);
+
+    // IMPORTANT: Always close frames to prevent memory leaks
+    frame.close();
+  },
+  error: (err) => {
+    console.error('Decoding error:', err.message);
+  }
+});
+
+// Configure for H.264 decoding
+decoder.configure({
+  codec: 'avc1.42001f',  // H.264 Baseline Level 3.1
+  codedWidth: 1920,
+  codedHeight: 1080,
+});
+
+// Decode a keyframe
+const chunk = new EncodedVideoChunk({
+  type: 'key',
+  timestamp: 0,
+  data: h264KeyframeData
+});
+
+decoder.decode(chunk);
+
+// Wait for all frames to be decoded
+await decoder.flush();
+decoder.close();
+```
+
+<Warning>
+**Always call `frame.close()` in your output callback!**
+
+VideoFrames hold native memory that is not visible to JavaScript's garbage collector. Failing to close frames will cause memory leaks that can quickly exhaust system memory.
+</Warning>
+
+---
+
+## Constructor
+
+Creates a new `VideoDecoder` instance.
+
+```typescript
+new VideoDecoder(init: VideoDecoderInit)
+```
+
+<ParamField body="init" type="VideoDecoderInit" required>
+  Initialization object containing callbacks for decoded frames and errors.
+
+  <Expandable title="VideoDecoderInit properties">
+    <ParamField body="output" type="(frame: VideoFrame) => void" required>
+      Callback invoked when a frame is successfully decoded. The callback receives a `VideoFrame` that must be closed after use to prevent memory leaks.
+    </ParamField>
+
+    <ParamField body="error" type="(error: DOMException) => void" required>
+      Callback invoked when a decoding error occurs. The decoder transitions to the `closed` state after an error.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<Accordion title="Example: Creating a decoder">
+```typescript
+const decoder = new VideoDecoder({
+  output: (frame) => {
+    // Process the decoded frame
+    const data = new Uint8Array(frame.allocationSize());
+    frame.copyTo(data);
+
+    // MUST close to prevent memory leaks
+    frame.close();
+  },
+  error: (err) => {
+    console.error('Decoder error:', err.name, err.message);
+  }
+});
+```
+</Accordion>
+
+---
+
+## Properties
+
+<ResponseField name="state" type="CodecState" required>
+  Current state of the decoder. Possible values:
+
+  | Value | Description |
+  |-------|-------------|
+  | `'unconfigured'` | Initial state, or after calling `reset()`. Must call `configure()` before decoding. |
+  | `'configured'` | Ready to decode chunks via `decode()`. |
+  | `'closed'` | Decoder has been closed and cannot be used. |
+</ResponseField>
+
+<ResponseField name="decodeQueueSize" type="number" required>
+  Number of decode operations currently pending in the queue. Useful for implementing backpressure to avoid memory exhaustion when decoding faster than frames can be processed.
+
+  ```typescript
+  // Wait if queue gets too large
+  while (decoder.decodeQueueSize > 10) {
+    await new Promise(resolve => {
+      decoder.addEventListener('dequeue', resolve, { once: true });
+    });
+  }
+  ```
+</ResponseField>
+
+---
+
+## Static Methods
+
+### isConfigSupported()
+
+Checks if a decoder configuration is supported by the current system.
+
+```typescript
+static isConfigSupported(config: VideoDecoderConfig): Promise<VideoDecoderSupport>
+```
+
+<ParamField body="config" type="VideoDecoderConfig" required>
+  The decoder configuration to test for support.
+</ParamField>
+
+**Returns:** `Promise<VideoDecoderSupport>` - Object indicating whether the config is supported.
+
+<Accordion title="Example: Checking codec support">
+```typescript
+const support = await VideoDecoder.isConfigSupported({
+  codec: 'avc1.42001f',
+  codedWidth: 1920,
+  codedHeight: 1080
+});
+
+if (support.supported) {
+  console.log('H.264 decoding is supported');
+  decoder.configure(support.config);
+} else {
+  console.log('H.264 decoding is NOT supported');
+}
+```
+</Accordion>
+
+<Accordion title="Example: Testing hardware acceleration">
+```typescript
+// Check for hardware-accelerated decoding
+const hwSupport = await VideoDecoder.isConfigSupported({
+  codec: 'avc1.42001f',
+  codedWidth: 3840,
+  codedHeight: 2160,
+  hardwareAcceleration: 'prefer-hardware'
+});
+
+if (!hwSupport.supported) {
+  // Fallback to software decoder
+  const swSupport = await VideoDecoder.isConfigSupported({
+    codec: 'avc1.42001f',
+    codedWidth: 3840,
+    codedHeight: 2160,
+    hardwareAcceleration: 'prefer-software'
+  });
+}
+```
+</Accordion>
+
+---
+
+## Methods
+
+### configure()
+
+Configures the decoder with the specified codec and parameters.
+
+```typescript
+configure(config: VideoDecoderConfig): void
+```
+
+<ParamField body="config" type="VideoDecoderConfig" required>
+  Configuration object specifying codec and video parameters.
+
+  <Expandable title="VideoDecoderConfig properties">
+    <ParamField body="codec" type="string" required>
+      Codec identifier string. Supports WebCodecs MIME types and FFmpeg codec names.
+
+      **Common values:**
+      - `'avc1.42001f'` - H.264 Baseline Level 3.1
+      - `'avc1.4d001f'` - H.264 Main Level 3.1
+      - `'avc1.64001f'` - H.264 High Level 3.1
+      - `'vp8'` - VP8
+      - `'vp09.00.10.08'` - VP9 Profile 0
+      - `'hev1.1.6.L93.B0'` - HEVC Main
+      - `'av01.0.08M.08'` - AV1 Main
+    </ParamField>
+
+    <ParamField body="codedWidth" type="number">
+      Width of the coded video in pixels. Required for some codecs.
+    </ParamField>
+
+    <ParamField body="codedHeight" type="number">
+      Height of the coded video in pixels. Required for some codecs.
+    </ParamField>
+
+    <ParamField body="displayAspectWidth" type="number">
+      Display aspect width for non-square pixel video. Defaults to `codedWidth`.
+    </ParamField>
+
+    <ParamField body="displayAspectHeight" type="number">
+      Display aspect height for non-square pixel video. Defaults to `codedHeight`.
+    </ParamField>
+
+    <ParamField body="colorSpace" type="object">
+      Color space metadata for the decoded frames.
+
+      <Expandable title="colorSpace properties">
+        <ParamField body="primaries" type="string">
+          Color primaries (e.g., `'bt709'`, `'bt2020'`, `'smpte432'`).
+        </ParamField>
+
+        <ParamField body="transfer" type="string">
+          Transfer characteristics (e.g., `'bt709'`, `'pq'`, `'hlg'`).
+        </ParamField>
+
+        <ParamField body="matrix" type="string">
+          Matrix coefficients (e.g., `'bt709'`, `'bt2020-ncl'`).
+        </ParamField>
+
+        <ParamField body="fullRange" type="boolean">
+          Whether to use full-range color values (`true`) or limited range (`false`).
+        </ParamField>
+      </Expandable>
+    </ParamField>
+
+    <ParamField body="hardwareAcceleration" type="'no-preference' | 'prefer-hardware' | 'prefer-software'">
+      Hardware acceleration preference.
+
+      | Value | Description |
+      |-------|-------------|
+      | `'no-preference'` | Let the decoder decide (default) |
+      | `'prefer-hardware'` | Use GPU decoding if available |
+      | `'prefer-software'` | Force CPU-based decoding |
+    </ParamField>
+
+    <ParamField body="optimizeForLatency" type="boolean">
+      When `true`, optimize for low latency at the cost of throughput. Useful for real-time applications like video conferencing.
+    </ParamField>
+
+    <ParamField body="description" type="BufferSource">
+      Codec-specific extradata (e.g., H.264 SPS/PPS NALUs, VP9 CodecPrivate). Required for some codecs and containers.
+    </ParamField>
+
+    <ParamField body="useWorkerThread" type="boolean" default="true">
+      Use asynchronous decoding via worker threads. Set to `false` for synchronous decoding that blocks the event loop.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+**Throws:**
+- `InvalidStateError` if the decoder is closed
+- `NotSupportedError` if the codec is not supported
+
+<Accordion title="Example: Basic H.264 configuration">
+```typescript
+decoder.configure({
+  codec: 'avc1.42001f',
+  codedWidth: 1920,
+  codedHeight: 1080
+});
+```
+</Accordion>
+
+<Accordion title="Example: Configuration with extradata">
+```typescript
+// H.264 with SPS/PPS from container
+decoder.configure({
+  codec: 'avc1.64001f',
+  codedWidth: 1920,
+  codedHeight: 1080,
+  description: spsAndPpsBuffer  // From MP4 avcC box or similar
+});
+```
+</Accordion>
+
+<Accordion title="Example: HDR video configuration">
+```typescript
+decoder.configure({
+  codec: 'hev1.2.4.L153.B0',  // HEVC Main 10
+  codedWidth: 3840,
+  codedHeight: 2160,
+  colorSpace: {
+    primaries: 'bt2020',
+    transfer: 'pq',           // HDR10 PQ transfer
+    matrix: 'bt2020-ncl',
+    fullRange: false
+  },
+  hardwareAcceleration: 'prefer-hardware'
+});
+```
+</Accordion>
+
+---
+
+### decode()
+
+Queues an encoded video chunk for decoding.
+
+```typescript
+decode(chunk: EncodedVideoChunk): void
+```
+
+<ParamField body="chunk" type="EncodedVideoChunk" required>
+  The encoded video chunk to decode. Can be a keyframe (`type: 'key'`) or delta frame (`type: 'delta'`).
+</ParamField>
+
+**Throws:**
+- `InvalidStateError` if the decoder is not configured
+- `DataError` if the chunk data is malformed
+
+<Accordion title="Example: Decoding a stream of chunks">
+```typescript
+// Decode a sequence of frames
+for (const chunkData of encodedFrames) {
+  const chunk = new EncodedVideoChunk({
+    type: chunkData.isKeyframe ? 'key' : 'delta',
+    timestamp: chunkData.timestamp,
+    duration: chunkData.duration,
+    data: chunkData.data
+  });
+
+  decoder.decode(chunk);
+
+  // Implement backpressure
+  if (decoder.decodeQueueSize > 10) {
+    await decoder.flush();
+  }
+}
+```
+</Accordion>
+
+---
+
+### flush()
+
+Waits for all pending decode operations to complete.
+
+```typescript
+flush(): Promise<void>
+```
+
+**Returns:** `Promise<void>` - Resolves when all queued chunks have been decoded and all output callbacks have been invoked.
+
+**Throws:**
+- `InvalidStateError` if the decoder is not configured
+
+<Accordion title="Example: Ensuring all frames are decoded">
+```typescript
+// Decode all chunks
+for (const chunk of chunks) {
+  decoder.decode(chunk);
+}
+
+// Wait for decoding to complete
+await decoder.flush();
+console.log('All frames decoded!');
+
+// Safe to close now
+decoder.close();
+```
+</Accordion>
+
+---
+
+### reset()
+
+Resets the decoder to the unconfigured state, discarding all pending work.
+
+```typescript
+reset(): void
+```
+
+Aborts all pending decode operations and clears the decode queue. The decoder returns to the `'unconfigured'` state and must be reconfigured before use.
+
+**Throws:**
+- `InvalidStateError` if the decoder is closed
+
+<Accordion title="Example: Resetting for new stream">
+```typescript
+// Abort current decoding and reconfigure
+decoder.reset();
+
+// Now reconfigure for a different video
+decoder.configure({
+  codec: 'vp09.00.10.08',
+  codedWidth: 1280,
+  codedHeight: 720
+});
+```
+</Accordion>
+
+---
+
+### close()
+
+Closes the decoder and releases all resources.
+
+```typescript
+close(): void
+```
+
+After calling `close()`, the decoder cannot be used. Any pending decode operations are aborted.
+
+<Accordion title="Example: Proper cleanup">
+```typescript
+// Finish any pending work
+await decoder.flush();
+
+// Release resources
+decoder.close();
+
+// decoder.decode() will now throw InvalidStateError
+```
+</Accordion>
+
+---
+
+### addEventListener()
+
+Adds an event listener for decoder events.
+
+```typescript
+addEventListener(
+  type: string,
+  listener: () => void,
+  options?: { once?: boolean }
+): void
+```
+
+<ParamField body="type" type="string" required>
+  Event type. Currently only `'dequeue'` is supported.
+</ParamField>
+
+<ParamField body="listener" type="() => void" required>
+  Callback function to invoke when the event fires.
+</ParamField>
+
+<ParamField body="options" type="object">
+  Event listener options.
+
+  <Expandable title="options properties">
+    <ParamField body="once" type="boolean">
+      If `true`, the listener is automatically removed after being invoked once.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<Accordion title="Example: Backpressure using dequeue event">
+```typescript
+// Wait for queue to have space
+async function waitForQueueSpace(decoder, maxQueueSize) {
+  while (decoder.decodeQueueSize >= maxQueueSize) {
+    await new Promise(resolve => {
+      decoder.addEventListener('dequeue', resolve, { once: true });
+    });
+  }
+}
+
+// Use in decode loop
+for (const chunk of chunks) {
+  await waitForQueueSpace(decoder, 10);
+  decoder.decode(chunk);
+}
+```
+</Accordion>
+
+---
+
+### removeEventListener()
+
+Removes a previously added event listener.
+
+```typescript
+removeEventListener(type: string, listener: () => void): void
+```
+
+<ParamField body="type" type="string" required>
+  Event type (e.g., `'dequeue'`).
+</ParamField>
+
+<ParamField body="listener" type="() => void" required>
+  The callback function to remove.
+</ParamField>
+
+<Accordion title="Example: Removing a listener">
+```typescript
+function onDequeue() {
+  console.log('Queue size:', decoder.decodeQueueSize);
+}
+
+decoder.addEventListener('dequeue', onDequeue);
+
+// Later, remove the listener
+decoder.removeEventListener('dequeue', onDequeue);
+```
+</Accordion>
+
+---
 
 ## Interfaces
 
 ### VideoDecoderConfig
 
-Defined in: [VideoDecoder.ts:11](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L11)
+Configuration options for the video decoder.
 
-#### Properties
+```typescript
+interface VideoDecoderConfig {
+  codec: string;                                    // Required
+  codedWidth?: number;
+  codedHeight?: number;
+  displayAspectWidth?: number;
+  displayAspectHeight?: number;
+  colorSpace?: {
+    primaries?: string;
+    transfer?: string;
+    matrix?: string;
+    fullRange?: boolean;
+  };
+  hardwareAcceleration?: 'no-preference' | 'prefer-hardware' | 'prefer-software';
+  optimizeForLatency?: boolean;
+  description?: BufferSource;
+  useWorkerThread?: boolean;                        // node-webcodecs extension
+}
+```
 
-##### codec
-
-> **codec**: `string`
-
-Defined in: [VideoDecoder.ts:12](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L12)
-
-##### codedWidth?
-
-> `optional` **codedWidth**: `number`
-
-Defined in: [VideoDecoder.ts:13](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L13)
-
-##### codedHeight?
-
-> `optional` **codedHeight**: `number`
-
-Defined in: [VideoDecoder.ts:14](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L14)
-
-##### displayAspectWidth?
-
-> `optional` **displayAspectWidth**: `number`
-
-Defined in: [VideoDecoder.ts:15](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L15)
-
-##### displayAspectHeight?
-
-> `optional` **displayAspectHeight**: `number`
-
-Defined in: [VideoDecoder.ts:16](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L16)
-
-##### colorSpace?
-
-> `optional` **colorSpace**: `object`
-
-Defined in: [VideoDecoder.ts:17](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L17)
-
-###### primaries?
-
-> `optional` **primaries**: `string`
-
-###### transfer?
-
-> `optional` **transfer**: `string`
-
-###### matrix?
-
-> `optional` **matrix**: `string`
-
-###### fullRange?
-
-> `optional` **fullRange**: `boolean`
-
-##### hardwareAcceleration?
-
-> `optional` **hardwareAcceleration**: `"no-preference"` \| `"prefer-hardware"` \| `"prefer-software"`
-
-Defined in: [VideoDecoder.ts:23](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L23)
-
-##### optimizeForLatency?
-
-> `optional` **optimizeForLatency**: `boolean`
-
-Defined in: [VideoDecoder.ts:24](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L24)
-
-##### description?
-
-> `optional` **description**: [`BufferSource`](types.mdx#buffersource)
-
-Defined in: [VideoDecoder.ts:25](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L25)
-
-##### useWorkerThread?
-
-> `optional` **useWorkerThread**: `boolean`
-
-Defined in: [VideoDecoder.ts:30](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L30)
-
-Use async (non-blocking) decoder. Defaults to true.
-Set to false to use synchronous decoder (blocks event loop during decoding).
-
-***
+---
 
 ### VideoDecoderInit
 
-Defined in: [VideoDecoder.ts:33](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L33)
+Initialization callbacks for the decoder constructor.
 
-#### Properties
+```typescript
+interface VideoDecoderInit {
+  output: (frame: VideoFrame) => void;              // Required
+  error: (error: DOMException) => void;             // Required
+}
+```
 
-##### output()
-
-> **output**: (`frame`) => `void`
-
-Defined in: [VideoDecoder.ts:34](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L34)
-
-###### Parameters
-
-###### frame
-
-[`VideoFrame`](VideoFrame.mdx#videoframe)
-
-###### Returns
-
-`void`
-
-##### error()
-
-> **error**: (`error`) => `void`
-
-Defined in: [VideoDecoder.ts:35](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L35)
-
-###### Parameters
-
-###### error
-
-[`WebCodecsDOMException`](types.mdx#webcodecsdomexception)
-
-###### Returns
-
-`void`
-
-***
+---
 
 ### VideoDecoderSupport
 
-Defined in: [VideoDecoder.ts:38](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L38)
+Result of `isConfigSupported()`.
 
-#### Properties
+```typescript
+interface VideoDecoderSupport {
+  supported: boolean;                               // Whether config is supported
+  config: VideoDecoderConfig;                       // The tested configuration
+}
+```
 
-##### supported
+---
 
-> **supported**: `boolean`
+## Hardware Decoding
 
-Defined in: [VideoDecoder.ts:39](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L39)
+Hardware-accelerated decoding uses GPU decoders for improved performance and reduced CPU usage. This is especially beneficial for 4K+ video or when processing multiple streams.
 
-##### config
+<Note>
+Hardware decoder availability depends on your system:
+- **macOS**: VideoToolbox (all Macs)
+- **Windows/Linux**: NVDEC (NVIDIA GPUs), VA-API (Intel/AMD)
+- **Raspberry Pi**: V4L2 M2M
+</Note>
 
-> **config**: [`VideoDecoderConfig`](#videodecoderconfig)
+```typescript
+// Request hardware acceleration
+decoder.configure({
+  codec: 'avc1.42001f',
+  codedWidth: 3840,
+  codedHeight: 2160,
+  hardwareAcceleration: 'prefer-hardware'
+});
 
-Defined in: [VideoDecoder.ts:40](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoDecoder.ts#L40)
+// Check if hardware decoding is actually being used
+const support = await VideoDecoder.isConfigSupported({
+  codec: 'avc1.42001f',
+  codedWidth: 3840,
+  codedHeight: 2160,
+  hardwareAcceleration: 'prefer-hardware'
+});
+
+if (support.supported) {
+  console.log('Hardware decoding available');
+} else {
+  console.log('Falling back to software decoding');
+}
+```
+
+---
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="VideoFrame" icon="image" href="/api-reference/VideoFrame">
+    Raw video frame data output by the decoder
+  </Card>
+  <Card title="VideoEncoder" icon="video" href="/api-reference/VideoEncoder">
+    Encode VideoFrames into compressed video
+  </Card>
+  <Card title="EncodedVideoChunk" icon="cube" href="/api-reference/EncodedVideoChunk">
+    Compressed video data input to the decoder
+  </Card>
+  <Card title="Hardware Acceleration" icon="microchip" href="/guides/hardware-acceleration">
+    Guide to GPU-accelerated encoding/decoding
+  </Card>
+</CardGroup>

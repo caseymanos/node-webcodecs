@@ -1,378 +1,427 @@
 ---
 title: "Types"
-description: "TypeScript type definitions and common types used across the API"
+description: "TypeScript type definitions and common types used across the WebCodecs API"
+icon: "code"
 ---
 
-# types
+## Overview
+
+This module provides core type definitions used throughout the WebCodecs API. These types ensure type safety and compatibility with the W3C WebCodecs specification while adapting to Node.js environments.
+
+<CardGroup cols={2}>
+  <Card title="Type Aliases" icon="hashtag" href="#buffersource">
+    Common type definitions like BufferSource and CodecState
+  </Card>
+  <Card title="Classes" icon="cube" href="#domrectreadonly">
+    DOMRectReadOnly and WebCodecsDOMException classes
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation" href="#webcodecsdomexception">
+    DOM exception types with standard error codes
+  </Card>
+  <Card title="Codec States" icon="diagram-project" href="#codecstate">
+    State machine for encoder and decoder lifecycles
+  </Card>
+</CardGroup>
+
+---
+
+## BufferSource
+
+A union type representing binary data that can be passed to WebCodecs APIs.
+
+```typescript
+type BufferSource = ArrayBuffer | ArrayBufferView
+```
+
+<Info>
+  `BufferSource` accepts any typed array (Uint8Array, Float32Array, etc.) or raw ArrayBuffer. This is the standard way to pass binary data like encoded video frames or audio samples.
+</Info>
+
+### Examples
+
+```typescript
+import { VideoDecoder } from '@aspect/aspect-webcodecs-polyfill';
+
+// Using Uint8Array (most common)
+const chunk = new EncodedVideoChunk({
+  type: 'key',
+  timestamp: 0,
+  data: new Uint8Array([0x00, 0x00, 0x01, ...])
+});
+
+// Using ArrayBuffer directly
+const buffer = new ArrayBuffer(1024);
+const audioData = new AudioData({
+  format: 'f32',
+  sampleRate: 48000,
+  numberOfFrames: 256,
+  numberOfChannels: 2,
+  timestamp: 0,
+  data: buffer
+});
+
+// Using a view into an existing buffer
+const largeBuffer = new ArrayBuffer(10000);
+const slice = new Uint8Array(largeBuffer, 100, 500);
+```
+
+---
+
+## CodecState
+
+Represents the current state of a video or audio encoder/decoder.
+
+```typescript
+type CodecState = "unconfigured" | "configured" | "closed"
+```
+
+### State Values
+
+<ResponseField name="unconfigured" type="string">
+  Initial state before `configure()` is called. The codec cannot process data in this state.
+</ResponseField>
+
+<ResponseField name="configured" type="string">
+  Active state after successful `configure()` call. The codec is ready to encode or decode data.
+</ResponseField>
 
-## Classes
+<ResponseField name="closed" type="string">
+  Terminal state after `close()` is called. The codec cannot be used again and resources are released.
+</ResponseField>
 
-### DOMRectReadOnly
+### State Transitions
+
+The codec follows a strict state machine:
 
-Defined in: [types.ts:9](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L9)
+```
+                    configure()
+    +---------------+------------>+---------------+
+    | unconfigured  |             |  configured   |
+    +---------------+<------------+---------------+
+           |            reset()          |
+           |                             |
+           |  close()                    |  close()
+           v                             v
+    +----------------------------------------------+
+    |                    closed                    |
+    +----------------------------------------------+
+```
 
-#### Constructors
+<Steps>
+  <Step title="unconfigured to configured">
+    Call `configure()` with a valid configuration object. The codec validates the configuration and prepares internal resources.
+  </Step>
+  <Step title="configured to unconfigured">
+    Call `reset()` to return to the unconfigured state. This clears any pending work and allows reconfiguration with different parameters.
+  </Step>
+  <Step title="Any state to closed">
+    Call `close()` from any state to permanently shut down the codec and release all resources. This is irreversible.
+  </Step>
+</Steps>
 
-##### Constructor
-
-> **new DOMRectReadOnly**(`x`, `y`, `width`, `height`): [`DOMRectReadOnly`](#domrectreadonly)
-
-Defined in: [types.ts:19](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L19)
-
-###### Parameters
-
-###### x
-
-`number` = `0`
-
-###### y
-
-`number` = `0`
-
-###### width
-
-`number` = `0`
-
-###### height
-
-`number` = `0`
-
-###### Returns
-
-[`DOMRectReadOnly`](#domrectreadonly)
-
-#### Properties
-
-##### x
-
-> `readonly` **x**: `number`
-
-Defined in: [types.ts:10](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L10)
-
-##### y
-
-> `readonly` **y**: `number`
-
-Defined in: [types.ts:11](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L11)
-
-##### width
-
-> `readonly` **width**: `number`
-
-Defined in: [types.ts:12](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L12)
-
-##### height
-
-> `readonly` **height**: `number`
-
-Defined in: [types.ts:13](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L13)
-
-##### top
-
-> `readonly` **top**: `number`
-
-Defined in: [types.ts:14](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L14)
-
-##### right
-
-> `readonly` **right**: `number`
-
-Defined in: [types.ts:15](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L15)
-
-##### bottom
-
-> `readonly` **bottom**: `number`
-
-Defined in: [types.ts:16](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L16)
-
-##### left
-
-> `readonly` **left**: `number`
-
-Defined in: [types.ts:17](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L17)
-
-#### Methods
-
-##### toJSON()
-
-> **toJSON**(): `object`
-
-Defined in: [types.ts:30](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L30)
-
-###### Returns
-
-`object`
-
-###### x
-
-> **x**: `number`
-
-###### y
-
-> **y**: `number`
-
-###### width
-
-> **width**: `number`
-
-###### height
-
-> **height**: `number`
-
-***
-
-### WebCodecsDOMException
-
-Defined in: [types.ts:36](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L36)
-
-#### Extends
-
-- `Error`
-
-#### Constructors
-
-##### Constructor
-
-> **new WebCodecsDOMException**(`message?`, `name?`): [`WebCodecsDOMException`](#webcodecsdomexception)
-
-Defined in: [types.ts:100](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L100)
-
-###### Parameters
-
-###### message?
-
-`string`
-
-###### name?
-
-`string`
-
-###### Returns
-
-[`WebCodecsDOMException`](#webcodecsdomexception)
-
-###### Overrides
-
-`Error.constructor`
-
-#### Properties
-
-##### name
-
-> `readonly` **name**: `string`
-
-Defined in: [types.ts:37](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L37)
-
-###### Overrides
-
-`Error.name`
-
-##### code
-
-> `readonly` **code**: `number`
-
-Defined in: [types.ts:38](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L38)
-
-##### INDEX\_SIZE\_ERR
-
-> `readonly` `static` **INDEX\_SIZE\_ERR**: `1` = `1`
-
-Defined in: [types.ts:40](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L40)
-
-##### DOMSTRING\_SIZE\_ERR
-
-> `readonly` `static` **DOMSTRING\_SIZE\_ERR**: `2` = `2`
-
-Defined in: [types.ts:41](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L41)
-
-##### HIERARCHY\_REQUEST\_ERR
-
-> `readonly` `static` **HIERARCHY\_REQUEST\_ERR**: `3` = `3`
-
-Defined in: [types.ts:42](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L42)
-
-##### WRONG\_DOCUMENT\_ERR
-
-> `readonly` `static` **WRONG\_DOCUMENT\_ERR**: `4` = `4`
-
-Defined in: [types.ts:43](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L43)
-
-##### INVALID\_CHARACTER\_ERR
-
-> `readonly` `static` **INVALID\_CHARACTER\_ERR**: `5` = `5`
-
-Defined in: [types.ts:44](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L44)
-
-##### NO\_DATA\_ALLOWED\_ERR
-
-> `readonly` `static` **NO\_DATA\_ALLOWED\_ERR**: `6` = `6`
-
-Defined in: [types.ts:45](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L45)
-
-##### NO\_MODIFICATION\_ALLOWED\_ERR
-
-> `readonly` `static` **NO\_MODIFICATION\_ALLOWED\_ERR**: `7` = `7`
-
-Defined in: [types.ts:46](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L46)
-
-##### NOT\_FOUND\_ERR
-
-> `readonly` `static` **NOT\_FOUND\_ERR**: `8` = `8`
-
-Defined in: [types.ts:47](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L47)
-
-##### NOT\_SUPPORTED\_ERR
-
-> `readonly` `static` **NOT\_SUPPORTED\_ERR**: `9` = `9`
-
-Defined in: [types.ts:48](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L48)
-
-##### INUSE\_ATTRIBUTE\_ERR
-
-> `readonly` `static` **INUSE\_ATTRIBUTE\_ERR**: `10` = `10`
-
-Defined in: [types.ts:49](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L49)
-
-##### INVALID\_STATE\_ERR
-
-> `readonly` `static` **INVALID\_STATE\_ERR**: `11` = `11`
-
-Defined in: [types.ts:50](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L50)
-
-##### SYNTAX\_ERR
-
-> `readonly` `static` **SYNTAX\_ERR**: `12` = `12`
-
-Defined in: [types.ts:51](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L51)
-
-##### INVALID\_MODIFICATION\_ERR
-
-> `readonly` `static` **INVALID\_MODIFICATION\_ERR**: `13` = `13`
-
-Defined in: [types.ts:52](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L52)
-
-##### NAMESPACE\_ERR
-
-> `readonly` `static` **NAMESPACE\_ERR**: `14` = `14`
-
-Defined in: [types.ts:53](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L53)
-
-##### INVALID\_ACCESS\_ERR
-
-> `readonly` `static` **INVALID\_ACCESS\_ERR**: `15` = `15`
-
-Defined in: [types.ts:54](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L54)
-
-##### VALIDATION\_ERR
-
-> `readonly` `static` **VALIDATION\_ERR**: `16` = `16`
-
-Defined in: [types.ts:55](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L55)
-
-##### TYPE\_MISMATCH\_ERR
-
-> `readonly` `static` **TYPE\_MISMATCH\_ERR**: `17` = `17`
-
-Defined in: [types.ts:56](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L56)
-
-##### SECURITY\_ERR
-
-> `readonly` `static` **SECURITY\_ERR**: `18` = `18`
-
-Defined in: [types.ts:57](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L57)
-
-##### NETWORK\_ERR
-
-> `readonly` `static` **NETWORK\_ERR**: `19` = `19`
-
-Defined in: [types.ts:58](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L58)
-
-##### ABORT\_ERR
-
-> `readonly` `static` **ABORT\_ERR**: `20` = `20`
-
-Defined in: [types.ts:59](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L59)
-
-##### URL\_MISMATCH\_ERR
-
-> `readonly` `static` **URL\_MISMATCH\_ERR**: `21` = `21`
-
-Defined in: [types.ts:60](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L60)
-
-##### QUOTA\_EXCEEDED\_ERR
-
-> `readonly` `static` **QUOTA\_EXCEEDED\_ERR**: `22` = `22`
-
-Defined in: [types.ts:61](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L61)
-
-##### TIMEOUT\_ERR
-
-> `readonly` `static` **TIMEOUT\_ERR**: `23` = `23`
-
-Defined in: [types.ts:62](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L62)
-
-##### INVALID\_NODE\_TYPE\_ERR
-
-> `readonly` `static` **INVALID\_NODE\_TYPE\_ERR**: `24` = `24`
-
-Defined in: [types.ts:63](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L63)
-
-##### DATA\_CLONE\_ERR
-
-> `readonly` `static` **DATA\_CLONE\_ERR**: `25` = `25`
-
-Defined in: [types.ts:64](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L64)
-
-## Type Aliases
-
-### BufferSource
-
-> **BufferSource** = `ArrayBuffer` \| `ArrayBufferView`
-
-Defined in: [types.ts:6](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L6)
-
-WebCodecs type definitions for Node.js
-
-***
-
-### WebCodecsError
-
-> **WebCodecsError** = [`WebCodecsDOMException`](#webcodecsdomexception)
-
-Defined in: [types.ts:110](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L110)
-
-***
-
-### CodecState
-
-> **CodecState** = `"unconfigured"` \| `"configured"` \| `"closed"`
-
-Defined in: [types.ts:120](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L120)
-
-## Functions
+<Warning>
+  Attempting to call `encode()`, `decode()`, or `configure()` on a closed codec will throw an `InvalidStateError`. Always check the `state` property before performing operations.
+</Warning>
+
+### Usage Example
+
+```typescript
+const decoder = new VideoDecoder({
+  output: (frame) => handleFrame(frame),
+  error: (e) => console.error(e)
+});
+
+console.log(decoder.state); // "unconfigured"
+
+await decoder.configure({
+  codec: 'avc1.42E01E',
+  codedWidth: 1920,
+  codedHeight: 1080
+});
+
+console.log(decoder.state); // "configured"
+
+// Process video chunks...
+
+decoder.close();
+console.log(decoder.state); // "closed"
+```
+
+---
+
+## WebCodecsDOMException
+
+A DOM-style exception class for WebCodecs errors. Extends the standard `Error` class with a numeric `code` property for compatibility with browser APIs.
+
+### Constructor
+
+```typescript
+new WebCodecsDOMException(message?: string, name?: string): WebCodecsDOMException
+```
+
+<ParamField path="message" type="string">
+  Optional error message describing what went wrong.
+</ParamField>
+
+<ParamField path="name" type="string">
+  Optional error name (e.g., "NotSupportedError", "InvalidStateError"). Determines the numeric code.
+</ParamField>
+
+### Instance Properties
+
+<ResponseField name="name" type="string" required>
+  The name of the error (e.g., "NotSupportedError", "InvalidStateError", "AbortError").
+</ResponseField>
+
+<ResponseField name="code" type="number" required>
+  Numeric error code matching the W3C DOM exception codes.
+</ResponseField>
+
+<ResponseField name="message" type="string" required>
+  Human-readable description of the error.
+</ResponseField>
+
+### Common Error Codes
+
+The following table lists the error codes most frequently encountered when using WebCodecs:
+
+| Code | Name | Constant | Description |
+|------|------|----------|-------------|
+| 9 | NotSupportedError | `NOT_SUPPORTED_ERR` | The requested codec or configuration is not supported |
+| 11 | InvalidStateError | `INVALID_STATE_ERR` | Operation attempted in wrong codec state |
+| 20 | AbortError | `ABORT_ERR` | Operation was aborted (e.g., by reset() or close()) |
+
+<Info>
+  **NotSupportedError (code 9)** is thrown when:
+  - The codec string is invalid or not recognized
+  - The codec is not available on the current platform
+  - The configuration parameters are outside supported ranges
+</Info>
+
+<Info>
+  **InvalidStateError (code 11)** is thrown when:
+  - Calling `encode()`/`decode()` before `configure()`
+  - Calling any method on a closed codec
+  - Calling `configure()` on an already closed codec
+</Info>
+
+<Info>
+  **AbortError (code 20)** is thrown when:
+  - `reset()` is called while operations are pending
+  - `close()` is called while operations are pending
+  - The codec encounters an unrecoverable internal error
+</Info>
+
+### All Error Codes
+
+<Accordion title="Complete DOM Exception Code Reference">
+
+| Code | Constant | Description |
+|------|----------|-------------|
+| 1 | `INDEX_SIZE_ERR` | Index out of bounds |
+| 2 | `DOMSTRING_SIZE_ERR` | String size error (deprecated) |
+| 3 | `HIERARCHY_REQUEST_ERR` | Invalid hierarchy |
+| 4 | `WRONG_DOCUMENT_ERR` | Wrong document |
+| 5 | `INVALID_CHARACTER_ERR` | Invalid character |
+| 6 | `NO_DATA_ALLOWED_ERR` | No data allowed (deprecated) |
+| 7 | `NO_MODIFICATION_ALLOWED_ERR` | Modification not allowed |
+| 8 | `NOT_FOUND_ERR` | Not found |
+| 9 | `NOT_SUPPORTED_ERR` | Not supported |
+| 10 | `INUSE_ATTRIBUTE_ERR` | Attribute in use |
+| 11 | `INVALID_STATE_ERR` | Invalid state |
+| 12 | `SYNTAX_ERR` | Syntax error |
+| 13 | `INVALID_MODIFICATION_ERR` | Invalid modification |
+| 14 | `NAMESPACE_ERR` | Namespace error |
+| 15 | `INVALID_ACCESS_ERR` | Invalid access |
+| 16 | `VALIDATION_ERR` | Validation error (deprecated) |
+| 17 | `TYPE_MISMATCH_ERR` | Type mismatch |
+| 18 | `SECURITY_ERR` | Security error |
+| 19 | `NETWORK_ERR` | Network error |
+| 20 | `ABORT_ERR` | Aborted |
+| 21 | `URL_MISMATCH_ERR` | URL mismatch |
+| 22 | `QUOTA_EXCEEDED_ERR` | Quota exceeded |
+| 23 | `TIMEOUT_ERR` | Timeout |
+| 24 | `INVALID_NODE_TYPE_ERR` | Invalid node type |
+| 25 | `DATA_CLONE_ERR` | Data clone error |
+
+</Accordion>
+
+### Error Handling Example
+
+```typescript
+import { VideoDecoder, WebCodecsDOMException } from '@aspect/aspect-webcodecs-polyfill';
+
+const decoder = new VideoDecoder({
+  output: (frame) => frame.close(),
+  error: (e) => {
+    if (e instanceof WebCodecsDOMException) {
+      switch (e.code) {
+        case WebCodecsDOMException.NOT_SUPPORTED_ERR:
+          console.error('Codec not supported:', e.message);
+          break;
+        case WebCodecsDOMException.INVALID_STATE_ERR:
+          console.error('Invalid state:', e.message);
+          break;
+        case WebCodecsDOMException.ABORT_ERR:
+          console.error('Operation aborted:', e.message);
+          break;
+        default:
+          console.error('Unknown error:', e.code, e.message);
+      }
+    }
+  }
+});
+```
+
+---
+
+## DOMRectReadOnly
+
+An immutable rectangle class representing position and dimensions. Used by `VideoFrame.visibleRect` to describe the visible region of a video frame.
+
+### Constructor
+
+```typescript
+new DOMRectReadOnly(x?: number, y?: number, width?: number, height?: number): DOMRectReadOnly
+```
+
+<ParamField path="x" type="number" default="0">
+  The x-coordinate of the rectangle's origin.
+</ParamField>
+
+<ParamField path="y" type="number" default="0">
+  The y-coordinate of the rectangle's origin.
+</ParamField>
+
+<ParamField path="width" type="number" default="0">
+  The width of the rectangle.
+</ParamField>
+
+<ParamField path="height" type="number" default="0">
+  The height of the rectangle.
+</ParamField>
+
+### Properties
+
+<ResponseField name="x" type="number" required>
+  The x-coordinate of the rectangle's origin (left edge for positive width).
+</ResponseField>
+
+<ResponseField name="y" type="number" required>
+  The y-coordinate of the rectangle's origin (top edge for positive height).
+</ResponseField>
+
+<ResponseField name="width" type="number" required>
+  The width of the rectangle.
+</ResponseField>
+
+<ResponseField name="height" type="number" required>
+  The height of the rectangle.
+</ResponseField>
+
+<ResponseField name="top" type="number" required>
+  The y-coordinate of the top edge (minimum of y and y + height).
+</ResponseField>
+
+<ResponseField name="right" type="number" required>
+  The x-coordinate of the right edge (maximum of x and x + width).
+</ResponseField>
+
+<ResponseField name="bottom" type="number" required>
+  The y-coordinate of the bottom edge (maximum of y and y + height).
+</ResponseField>
+
+<ResponseField name="left" type="number" required>
+  The x-coordinate of the left edge (minimum of x and x + width).
+</ResponseField>
+
+### Methods
+
+#### toJSON()
+
+Returns a plain object representation of the rectangle.
+
+```typescript
+toJSON(): { x: number; y: number; width: number; height: number }
+```
+
+### Usage Example
+
+```typescript
+import { VideoFrame } from '@aspect/aspect-webcodecs-polyfill';
+
+// Create a video frame
+const frame = new VideoFrame(imageData, {
+  timestamp: 0,
+  visibleRect: { x: 10, y: 10, width: 1900, height: 1060 }
+});
+
+// Access the visible rectangle
+const rect = frame.visibleRect;
+console.log(`Position: (${rect.x}, ${rect.y})`);
+console.log(`Size: ${rect.width}x${rect.height}`);
+console.log(`Bounds: top=${rect.top}, right=${rect.right}, bottom=${rect.bottom}, left=${rect.left}`);
+
+// Serialize to JSON
+const json = rect.toJSON();
+// { x: 10, y: 10, width: 1900, height: 1060 }
+```
+
+---
+
+## Helper Functions
 
 ### createDOMException()
 
-> **createDOMException**(`message?`, `name?`): [`WebCodecsDOMException`](#webcodecsdomexception)
+Factory function to create a `WebCodecsDOMException` instance.
 
-Defined in: [types.ts:112](https://github.com/caseymanos/node-webcodecs/blob/master/src/types.ts#L112)
+```typescript
+function createDOMException(message?: string, name?: string): WebCodecsDOMException
+```
 
-#### Parameters
+<ParamField path="message" type="string">
+  Optional error message.
+</ParamField>
 
-##### message?
+<ParamField path="name" type="string">
+  Optional error name that determines the numeric code.
+</ParamField>
 
-`string`
+---
 
-##### name?
+## Type Aliases
 
-`string`
+### WebCodecsError
 
-#### Returns
+An alias for `WebCodecsDOMException` for convenience.
 
-[`WebCodecsDOMException`](#webcodecsdomexception)
-
-## References
+```typescript
+type WebCodecsError = WebCodecsDOMException
+```
 
 ### DOMException
 
-Renames and re-exports [WebCodecsDOMException](#webcodecsdomexception)
+Re-export of `WebCodecsDOMException` for browser API compatibility.
+
+```typescript
+const DOMException = WebCodecsDOMException
+```
+
+---
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="VideoEncoder" icon="film" href="/api-reference/video-encoder">
+    Encode raw video frames to compressed chunks
+  </Card>
+  <Card title="VideoDecoder" icon="play" href="/api-reference/video-decoder">
+    Decode compressed video to raw frames
+  </Card>
+  <Card title="AudioEncoder" icon="microphone" href="/api-reference/audio-encoder">
+    Encode raw audio samples to compressed data
+  </Card>
+  <Card title="AudioDecoder" icon="volume-high" href="/api-reference/audio-decoder">
+    Decode compressed audio to raw samples
+  </Card>
+</CardGroup>

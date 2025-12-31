@@ -39,5 +39,5 @@ thoughts/
 IMPLEMENTATION_PLAN.md
 *PLAN*.md
 
-# Documentation (auto-generated)
-docs/api-reference/
+# Documentation build artifacts
+docs/.mintlify/

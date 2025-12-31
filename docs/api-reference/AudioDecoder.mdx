@@ -1,228 +1,489 @@
 ---
 title: "AudioDecoder"
 description: "Decode EncodedAudioChunk objects into AudioData for playback and processing"
+icon: "volume-high"
 ---
 
 # AudioDecoder
 
-## Classes
+The `AudioDecoder` class decodes compressed audio data (EncodedAudioChunk) into raw audio samples (AudioData). It supports common audio codecs like AAC, MP3, Opus, and FLAC.
 
-### AudioDecoder
+<Info>
+This class follows the [W3C WebCodecs AudioDecoder specification](https://www.w3.org/TR/webcodecs/#audiodecoder-interface).
+</Info>
 
-Defined in: [AudioDecoder.ts:31](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L31)
+## Quick Example
 
-#### Constructors
+```typescript
+import { AudioDecoder, EncodedAudioChunk } from 'node-webcodecs';
 
-##### Constructor
+// Create decoder with callbacks
+const decoder = new AudioDecoder({
+  output: (audioData) => {
+    console.log(`Decoded ${audioData.numberOfFrames} samples`);
+    console.log(`Format: ${audioData.format}, Rate: ${audioData.sampleRate}Hz`);
 
-> **new AudioDecoder**(`init`): [`AudioDecoder`](#audiodecoder)
+    // Process the audio data...
 
-Defined in: [AudioDecoder.ts:44](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L44)
+    // IMPORTANT: Always close AudioData when done
+    audioData.close();
+  },
+  error: (e) => console.error('Decode error:', e)
+});
 
-###### Parameters
+// Configure for AAC decoding
+decoder.configure({
+  codec: 'mp4a.40.2',      // AAC-LC
+  sampleRate: 48000,
+  numberOfChannels: 2
+});
 
-###### init
+// Decode encoded chunks
+const chunk = new EncodedAudioChunk({
+  type: 'key',
+  timestamp: 0,
+  data: aacFrameData
+});
 
-[`AudioDecoderInit`](#audiodecoderinit)
+decoder.decode(chunk);
 
-###### Returns
+// Flush remaining data when done
+await decoder.flush();
+decoder.close();
+```
 
-[`AudioDecoder`](#audiodecoder)
+<Warning>
+Always call `audioData.close()` in your output callback after processing. AudioData objects hold native memory that JavaScript's garbage collector cannot reclaim automatically. Failing to close them will cause memory leaks.
+</Warning>
 
-#### Accessors
+---
 
-##### state
+## Constructor
 
-###### Get Signature
+Creates a new `AudioDecoder` instance.
 
-> **get** **state**(): [`CodecState`](types.mdx#codecstate)
+```typescript
+new AudioDecoder(init: AudioDecoderInit)
+```
 
-Defined in: [AudioDecoder.ts:63](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L63)
+<ParamField body="init" type="AudioDecoderInit" required>
+  Initialization object containing callback functions.
 
-###### Returns
+  <Expandable title="AudioDecoderInit properties">
+    <ParamField body="output" type="(data: AudioData) => void" required>
+      Callback invoked for each decoded audio frame. The `AudioData` object contains
+      raw PCM samples ready for playback or processing. You **must** call `audioData.close()`
+      when finished with each frame.
+    </ParamField>
+
+    <ParamField body="error" type="(error: DOMException) => void" required>
+      Callback invoked when a decoding error occurs. After an error, the decoder
+      transitions to the `'closed'` state and cannot be used further.
+    </ParamField>
+  </Expandable>
+</ParamField>
 
-[`CodecState`](types.mdx#codecstate)
+---
+
+## Properties
+
+<ResponseField name="state" type="CodecState" required>
+  Current state of the decoder. One of:
+  - `'unconfigured'` - Initial state, call `configure()` before decoding
+  - `'configured'` - Ready to decode chunks
+  - `'closed'` - Decoder has been closed and cannot be used
+</ResponseField>
+
+<ResponseField name="decodeQueueSize" type="number" required>
+  Number of chunks waiting to be decoded. Use this for backpressure management -
+  if the queue grows too large, pause feeding new chunks until it decreases.
+</ResponseField>
+
+---
+
+## Static Methods
+
+### isConfigSupported()
+
+Checks whether a given configuration is supported by the decoder without creating an instance.
+
+```typescript
+static isConfigSupported(config: AudioDecoderConfig): Promise<AudioDecoderSupport>
+```
+
+<ParamField body="config" type="AudioDecoderConfig" required>
+  The configuration to test for support.
+</ParamField>
+
+**Returns:** `Promise<AudioDecoderSupport>` - Object indicating whether the config is supported.
+
+<Accordion title="Example: Check codec support">
+```typescript
+import { AudioDecoder } from 'node-webcodecs';
+
+async function checkAACSupport() {
+  const support = await AudioDecoder.isConfigSupported({
+    codec: 'mp4a.40.2',
+    sampleRate: 48000,
+    numberOfChannels: 2
+  });
+
+  if (support.supported) {
+    console.log('AAC decoding is supported!');
+  } else {
+    console.log('AAC decoding is NOT supported');
+  }
+}
+```
+</Accordion>
+
+---
+
+## Instance Methods
+
+### configure()
+
+Configures the decoder with codec parameters. Must be called before `decode()`.
+
+```typescript
+configure(config: AudioDecoderConfig): void
+```
+
+<ParamField body="config" type="AudioDecoderConfig" required>
+  Configuration object specifying the codec and audio parameters.
+
+  <Expandable title="AudioDecoderConfig properties">
+    <ParamField body="codec" type="string" required>
+      The codec string. Common values:
+      - `'mp4a.40.2'` - AAC-LC (Low Complexity)
+      - `'mp4a.40.5'` - AAC-HE (High Efficiency)
+      - `'mp3'` - MP3 / MPEG-1 Audio Layer 3
+      - `'opus'` - Opus
+      - `'flac'` - FLAC
+      - `'vorbis'` - Vorbis
+    </ParamField>
+
+    <ParamField body="sampleRate" type="number" required>
+      Sample rate in Hz (e.g., 44100, 48000). Must match the encoded audio.
+    </ParamField>
+
+    <ParamField body="numberOfChannels" type="number" required>
+      Number of audio channels (1 for mono, 2 for stereo, etc.).
+    </ParamField>
+
+    <ParamField body="description" type="BufferSource">
+      Codec-specific configuration data (e.g., AudioSpecificConfig for AAC).
+      Required for some codecs when container metadata is not embedded in the stream.
+    </ParamField>
+  </Expandable>
+</ParamField>
 
-##### decodeQueueSize
+**Throws:** `InvalidStateError` if the decoder is closed.
+
+<Accordion title="Example: Configure for AAC-LC">
+```typescript
+decoder.configure({
+  codec: 'mp4a.40.2',      // AAC-LC
+  sampleRate: 48000,
+  numberOfChannels: 2
+});
+
+console.log(decoder.state); // 'configured'
+```
+</Accordion>
+
+<Accordion title="Example: Configure with AudioSpecificConfig">
+```typescript
+// For AAC from MP4 container, you may need the AudioSpecificConfig
+const audioSpecificConfig = new Uint8Array([0x11, 0x90]); // Example for 48kHz stereo AAC-LC
+
+decoder.configure({
+  codec: 'mp4a.40.2',
+  sampleRate: 48000,
+  numberOfChannels: 2,
+  description: audioSpecificConfig
+});
+```
+</Accordion>
 
-###### Get Signature
+---
 
-> **get** **decodeQueueSize**(): `number`
+### decode()
 
-Defined in: [AudioDecoder.ts:67](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L67)
-
-###### Returns
-
-`number`
-
-#### Methods
-
-##### isConfigSupported()
-
-> `static` **isConfigSupported**(`config`): `Promise`\<[`AudioDecoderSupport`](#audiodecodersupport)\>
-
-Defined in: [AudioDecoder.ts:39](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L39)
-
-###### Parameters
-
-###### config
-
-[`AudioDecoderConfig`](#audiodecoderconfig)
-
-###### Returns
-
-`Promise`\<[`AudioDecoderSupport`](#audiodecodersupport)\>
-
-##### configure()
-
-> **configure**(`config`): `void`
-
-Defined in: [AudioDecoder.ts:71](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L71)
-
-###### Parameters
-
-###### config
-
-[`AudioDecoderConfig`](#audiodecoderconfig)
-
-###### Returns
-
-`void`
-
-##### decode()
-
-> **decode**(`chunk`): `void`
-
-Defined in: [AudioDecoder.ts:110](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L110)
-
-###### Parameters
-
-###### chunk
-
-[`EncodedAudioChunk`](EncodedAudioChunk.mdx#encodedaudiochunk)
-
-###### Returns
-
-`void`
-
-##### flush()
-
-> **flush**(): `Promise`\<`void`\>
-
-Defined in: [AudioDecoder.ts:127](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L127)
-
-###### Returns
-
-`Promise`\<`void`\>
-
-##### reset()
-
-> **reset**(): `void`
-
-Defined in: [AudioDecoder.ts:143](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L143)
-
-###### Returns
-
-`void`
-
-##### close()
-
-> **close**(): `void`
-
-Defined in: [AudioDecoder.ts:156](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L156)
-
-###### Returns
-
-`void`
+Queues an encoded audio chunk for decoding. Decoded frames will be delivered asynchronously to the `output` callback.
+
+```typescript
+decode(chunk: EncodedAudioChunk): void
+```
+
+<ParamField body="chunk" type="EncodedAudioChunk" required>
+  The encoded audio chunk to decode. Unlike video, most audio chunks are keyframes
+  and can be decoded independently.
+</ParamField>
+
+**Throws:**
+- `InvalidStateError` if the decoder is not configured
+- `DataError` if the chunk data is malformed
+
+<Accordion title="Example: Decode audio stream">
+```typescript
+import { AudioDecoder, EncodedAudioChunk } from 'node-webcodecs';
+
+// Assuming you have an array of AAC frames from a parser
+const aacFrames: Uint8Array[] = parseAACStream(audioData);
+
+for (let i = 0; i < aacFrames.length; i++) {
+  const chunk = new EncodedAudioChunk({
+    type: 'key',                        // Audio frames are typically keyframes
+    timestamp: i * 21333,               // ~21ms per AAC frame at 48kHz
+    duration: 21333,
+    data: aacFrames[i]
+  });
+
+  decoder.decode(chunk);
+}
+```
+</Accordion>
+
+---
+
+### flush()
+
+Completes all pending decode operations. Call this when you've submitted all chunks and need to ensure all output has been delivered.
+
+```typescript
+flush(): Promise<void>
+```
+
+**Returns:** `Promise<void>` - Resolves when all queued chunks have been decoded and output.
+
+**Throws:** `InvalidStateError` if the decoder is not configured.
+
+<Accordion title="Example: Flush before closing">
+```typescript
+// After submitting all chunks
+await decoder.flush();
+console.log('All audio decoded');
+
+// Safe to close now
+decoder.close();
+```
+</Accordion>
+
+---
+
+### reset()
+
+Resets the decoder to the `'unconfigured'` state, discarding any pending work. The decoder can be reconfigured after reset.
+
+```typescript
+reset(): void
+```
+
+**Throws:** `InvalidStateError` if the decoder is closed.
+
+<Accordion title="Example: Reset and reconfigure">
+```typescript
+// Reset current decoding state
+decoder.reset();
+console.log(decoder.state); // 'unconfigured'
+
+// Reconfigure for different audio
+decoder.configure({
+  codec: 'opus',
+  sampleRate: 48000,
+  numberOfChannels: 1
+});
+```
+</Accordion>
+
+---
+
+### close()
+
+Closes the decoder and releases all resources. The decoder cannot be used after calling `close()`.
+
+```typescript
+close(): void
+```
+
+<Accordion title="Example: Proper cleanup">
+```typescript
+async function decodeAudioFile(chunks: EncodedAudioChunk[]) {
+  const decoder = new AudioDecoder({
+    output: (data) => {
+      processAudio(data);
+      data.close();
+    },
+    error: console.error
+  });
+
+  decoder.configure({ codec: 'mp4a.40.2', sampleRate: 48000, numberOfChannels: 2 });
+
+  for (const chunk of chunks) {
+    decoder.decode(chunk);
+  }
+
+  await decoder.flush();
+  decoder.close();  // Clean up resources
+}
+```
+</Accordion>
+
+---
 
 ## Interfaces
 
 ### AudioDecoderConfig
 
-Defined in: [AudioDecoder.ts:11](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L11)
+Configuration for the audio decoder.
 
-#### Properties
+```typescript
+interface AudioDecoderConfig {
+  codec: string;                    // Required: codec identifier
+  sampleRate: number;               // Required: sample rate in Hz
+  numberOfChannels: number;         // Required: number of channels
+  description?: BufferSource;       // Optional: codec-specific config
+}
+```
 
-##### codec
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `codec` | `string` | Yes | Codec string (e.g., `'mp4a.40.2'`, `'opus'`) |
+| `sampleRate` | `number` | Yes | Sample rate in Hz (e.g., 44100, 48000) |
+| `numberOfChannels` | `number` | Yes | Number of channels (1=mono, 2=stereo) |
+| `description` | `BufferSource` | No | Codec-specific configuration data |
 
-> **codec**: `string`
-
-Defined in: [AudioDecoder.ts:12](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L12)
-
-##### sampleRate
-
-> **sampleRate**: `number`
-
-Defined in: [AudioDecoder.ts:13](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L13)
-
-##### numberOfChannels
-
-> **numberOfChannels**: `number`
-
-Defined in: [AudioDecoder.ts:14](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L14)
-
-##### description?
-
-> `optional` **description**: [`BufferSource`](types.mdx#buffersource)
-
-Defined in: [AudioDecoder.ts:15](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L15)
-
-***
+---
 
 ### AudioDecoderInit
 
-Defined in: [AudioDecoder.ts:18](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L18)
+Initialization object for creating an AudioDecoder.
 
-#### Properties
+```typescript
+interface AudioDecoderInit {
+  output: (data: AudioData) => void;           // Required: decoded frame callback
+  error: (error: DOMException) => void;        // Required: error callback
+}
+```
 
-##### output()
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `output` | `(data: AudioData) => void` | Yes | Called with each decoded AudioData |
+| `error` | `(error: DOMException) => void` | Yes | Called when an error occurs |
 
-> **output**: (`data`) => `void`
-
-Defined in: [AudioDecoder.ts:19](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L19)
-
-###### Parameters
-
-###### data
-
-[`AudioData`](AudioData.mdx#audiodata)
-
-###### Returns
-
-`void`
-
-##### error()
-
-> **error**: (`error`) => `void`
-
-Defined in: [AudioDecoder.ts:20](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L20)
-
-###### Parameters
-
-###### error
-
-[`WebCodecsDOMException`](types.mdx#webcodecsdomexception)
-
-###### Returns
-
-`void`
-
-***
+---
 
 ### AudioDecoderSupport
 
-Defined in: [AudioDecoder.ts:23](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L23)
+Result from `isConfigSupported()`.
 
-#### Properties
+```typescript
+interface AudioDecoderSupport {
+  supported: boolean;               // Whether the config is supported
+  config: AudioDecoderConfig;       // The config that was tested
+}
+```
 
-##### supported
+| Property | Type | Description |
+|----------|------|-------------|
+| `supported` | `boolean` | `true` if the configuration is supported |
+| `config` | `AudioDecoderConfig` | The configuration that was tested |
 
-> **supported**: `boolean`
+---
 
-Defined in: [AudioDecoder.ts:24](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L24)
+## Common Codec Strings
 
-##### config
+| Codec | String | Description |
+|-------|--------|-------------|
+| AAC-LC | `'mp4a.40.2'` | AAC Low Complexity - most common |
+| AAC-HE | `'mp4a.40.5'` | AAC High Efficiency (SBR) |
+| AAC-HEv2 | `'mp4a.40.29'` | AAC High Efficiency v2 (SBR+PS) |
+| MP3 | `'mp3'` | MPEG-1 Audio Layer 3 |
+| Opus | `'opus'` | Opus codec |
+| FLAC | `'flac'` | Free Lossless Audio Codec |
+| Vorbis | `'vorbis'` | Ogg Vorbis |
 
-> **config**: [`AudioDecoderConfig`](#audiodecoderconfig)
+---
 
-Defined in: [AudioDecoder.ts:25](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioDecoder.ts#L25)
+## Complete Decoding Example
+
+```typescript
+import { AudioDecoder, EncodedAudioChunk } from 'node-webcodecs';
+
+async function decodeAACStream(aacFrames: Uint8Array[]): Promise<Float32Array[]> {
+  const decodedSamples: Float32Array[] = [];
+
+  const decoder = new AudioDecoder({
+    output: (audioData) => {
+      // Allocate buffer for all channels interleaved
+      const samples = new Float32Array(audioData.numberOfFrames * audioData.numberOfChannels);
+
+      // Copy samples for each channel
+      for (let ch = 0; ch < audioData.numberOfChannels; ch++) {
+        const channelData = new Float32Array(audioData.numberOfFrames);
+        audioData.copyTo(channelData, { planeIndex: ch, format: 'f32-planar' });
+
+        // Interleave into output
+        for (let i = 0; i < audioData.numberOfFrames; i++) {
+          samples[i * audioData.numberOfChannels + ch] = channelData[i];
+        }
+      }
+
+      decodedSamples.push(samples);
+      audioData.close();  // Always close!
+    },
+    error: (e) => {
+      throw new Error(`Decode error: ${e.message}`);
+    }
+  });
+
+  // Configure decoder
+  decoder.configure({
+    codec: 'mp4a.40.2',
+    sampleRate: 48000,
+    numberOfChannels: 2
+  });
+
+  // Decode all frames
+  let timestamp = 0;
+  const frameDuration = 21333; // ~21ms for AAC at 48kHz
+
+  for (const frame of aacFrames) {
+    const chunk = new EncodedAudioChunk({
+      type: 'key',
+      timestamp,
+      duration: frameDuration,
+      data: frame
+    });
+
+    decoder.decode(chunk);
+    timestamp += frameDuration;
+  }
+
+  // Wait for all decoding to complete
+  await decoder.flush();
+  decoder.close();
+
+  return decodedSamples;
+}
+```
+
+---
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="AudioData" icon="waveform" href="/api-reference/AudioData">
+    Raw audio sample data produced by decoding
+  </Card>
+  <Card title="AudioEncoder" icon="microphone" href="/api-reference/AudioEncoder">
+    Encode AudioData into EncodedAudioChunks
+  </Card>
+  <Card title="EncodedAudioChunk" icon="music" href="/api-reference/EncodedAudioChunk">
+    Compressed audio data for decoding
+  </Card>
+  <Card title="Codec Registry" icon="list" href="/api-reference/codec-registry">
+    Full list of supported codecs
+  </Card>
+</CardGroup>

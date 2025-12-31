@@ -1,135 +1,310 @@
 ---
 title: "AudioData"
 description: "Represents audio sample data with format and timestamp metadata"
+icon: "waveform"
 ---
 
 # AudioData
 
-## Classes
+The `AudioData` class represents a container for audio sample data. It provides access to raw audio samples along with metadata such as sample format, sample rate, channel count, and timestamps.
 
-### AudioData
+<Info>
+  This API follows the [W3C WebCodecs AudioData specification](https://www.w3.org/TR/webcodecs/#audiodata-interface). Refer to the spec for detailed behavior requirements.
+</Info>
 
-Defined in: [AudioData.ts:65](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L65)
+<Warning>
+  **Memory Management**: `AudioData` objects hold references to potentially large audio buffers. You **must** call `close()` when finished with an `AudioData` instance to release the underlying memory. Failure to do so can lead to memory leaks.
+</Warning>
 
-#### Constructors
+## Quick Example
 
-##### Constructor
+```typescript
+import { AudioData } from 'node-webcodecs';
 
-> **new AudioData**(`init`): [`AudioData`](#audiodata)
+// Create a 1-second stereo audio buffer at 48kHz
+const sampleRate = 48000;
+const numberOfChannels = 2;
+const numberOfFrames = sampleRate; // 1 second of audio
 
-Defined in: [AudioData.ts:77](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L77)
+// Create interleaved float32 audio data
+const samples = new Float32Array(numberOfFrames * numberOfChannels);
 
-###### Parameters
+// Fill with a 440Hz sine wave
+for (let i = 0; i < numberOfFrames; i++) {
+  const value = Math.sin(2 * Math.PI * 440 * i / sampleRate);
+  samples[i * numberOfChannels] = value;     // Left channel
+  samples[i * numberOfChannels + 1] = value; // Right channel
+}
 
-###### init
+const audioData = new AudioData({
+  format: 'f32',
+  sampleRate: sampleRate,
+  numberOfFrames: numberOfFrames,
+  numberOfChannels: numberOfChannels,
+  timestamp: 0,
+  data: samples.buffer
+});
 
-[`AudioDataInit`](#audiodatainit)
+console.log(`Duration: ${audioData.duration / 1_000_000} seconds`);
+console.log(`Format: ${audioData.format}`);
 
-###### Returns
+// Always close when done
+audioData.close();
+```
 
-[`AudioData`](#audiodata)
+## Sample Formats
 
-#### Properties
+<Tip>
+  **Planar vs Interleaved**: In **interleaved** formats, samples alternate between channels (L, R, L, R...). In **planar** formats, each channel's samples are stored contiguously in separate planes. Planar formats are often more efficient for audio processing, while interleaved formats are common for I/O operations.
+</Tip>
 
-##### format
+| Format | Description | Bytes/Sample |
+|--------|-------------|--------------|
+| `u8` | Unsigned 8-bit interleaved | 1 |
+| `s16` | Signed 16-bit interleaved | 2 |
+| `s32` | Signed 32-bit interleaved | 4 |
+| `f32` | 32-bit float interleaved | 4 |
+| `u8-planar` | Unsigned 8-bit planar | 1 |
+| `s16-planar` | Signed 16-bit planar | 2 |
+| `s32-planar` | Signed 32-bit planar | 4 |
+| `f32-planar` | 32-bit float planar | 4 |
 
-> `readonly` **format**: [`AudioSampleFormat`](#audiosampleformat) \| `null`
+## Constructor
 
-Defined in: [AudioData.ts:70](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L70)
+Creates a new `AudioData` instance from the provided initialization data.
 
-##### sampleRate
+```typescript
+new AudioData(init: AudioDataInit): AudioData
+```
 
-> `readonly` **sampleRate**: `number`
+### Parameters
 
-Defined in: [AudioData.ts:71](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L71)
+<ParamField path="init" type="AudioDataInit" required>
+  Configuration object for the audio data.
+  <Expandable title="AudioDataInit properties">
+    <ParamField path="format" type="AudioSampleFormat" required>
+      The sample format of the audio data. See the sample formats table above.
+    </ParamField>
+    <ParamField path="sampleRate" type="number" required>
+      The sample rate in Hz (e.g., 44100, 48000).
+    </ParamField>
+    <ParamField path="numberOfFrames" type="number" required>
+      The number of audio frames. Each frame contains one sample per channel.
+    </ParamField>
+    <ParamField path="numberOfChannels" type="number" required>
+      The number of audio channels (e.g., 1 for mono, 2 for stereo).
+    </ParamField>
+    <ParamField path="timestamp" type="number" required>
+      The presentation timestamp in microseconds.
+    </ParamField>
+    <ParamField path="data" type="BufferSource" required>
+      The raw audio sample data as an ArrayBuffer or TypedArray.
+    </ParamField>
+  </Expandable>
+</ParamField>
 
-##### numberOfFrames
+## Properties
 
-> `readonly` **numberOfFrames**: `number`
+<ResponseField name="format" type="AudioSampleFormat | null" required>
+  The sample format of the audio data. Returns `null` if the AudioData has been closed.
+</ResponseField>
 
-Defined in: [AudioData.ts:72](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L72)
+<ResponseField name="sampleRate" type="number" required>
+  The sample rate in Hz. This value indicates how many samples represent one second of audio.
+</ResponseField>
 
-##### numberOfChannels
+<ResponseField name="numberOfFrames" type="number" required>
+  The number of audio frames in this AudioData. A frame consists of one sample per channel at a single point in time.
+</ResponseField>
 
-> `readonly` **numberOfChannels**: `number`
+<ResponseField name="numberOfChannels" type="number" required>
+  The number of audio channels. For example, 1 for mono audio, 2 for stereo.
+</ResponseField>
 
-Defined in: [AudioData.ts:73](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L73)
+<ResponseField name="duration" type="number" required>
+  The duration in microseconds, calculated as `(numberOfFrames / sampleRate) * 1_000_000`.
+</ResponseField>
 
-##### duration
+<ResponseField name="timestamp" type="number" required>
+  The presentation timestamp in microseconds, indicating when this audio should be played.
+</ResponseField>
 
-> `readonly` **duration**: `number`
+## Methods
 
-Defined in: [AudioData.ts:74](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L74)
+### allocationSize()
 
-##### timestamp
+Calculates the number of bytes needed to hold the audio data when copying with the specified options.
 
-> `readonly` **timestamp**: `number`
+```typescript
+allocationSize(options: AudioDataCopyToOptions): number
+```
 
-Defined in: [AudioData.ts:75](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L75)
+<Accordion title="Example: Calculate buffer size">
+```typescript
+const audioData = new AudioData({
+  format: 'f32-planar',
+  sampleRate: 48000,
+  numberOfFrames: 1024,
+  numberOfChannels: 2,
+  timestamp: 0,
+  data: new Float32Array(1024 * 2).buffer
+});
 
-#### Methods
+// Calculate size for first plane (channel)
+const size = audioData.allocationSize({ planeIndex: 0 });
+console.log(`Bytes needed: ${size}`); // 4096 (1024 frames * 4 bytes per f32)
 
-##### allocationSize()
+audioData.close();
+```
+</Accordion>
 
-> **allocationSize**(`options`): `number`
+#### Parameters
 
-Defined in: [AudioData.ts:140](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L140)
+<ParamField path="options" type="AudioDataCopyToOptions" required>
+  Options specifying which portion of audio to measure.
+</ParamField>
 
-Calculate the size in bytes needed to hold the audio data for a plane
+#### Returns
 
-###### Parameters
+`number` - The number of bytes required.
 
-###### options
+---
 
-[`AudioDataCopyToOptions`](#audiodatacopytooptions)
+### copyTo()
 
-###### Returns
+Copies audio sample data to a destination buffer.
 
-`number`
+```typescript
+copyTo(destination: BufferSource, options: AudioDataCopyToOptions): void
+```
 
-##### copyTo()
+<Accordion title="Example: Copy audio data to a buffer">
+```typescript
+const audioData = new AudioData({
+  format: 'f32-planar',
+  sampleRate: 48000,
+  numberOfFrames: 1024,
+  numberOfChannels: 2,
+  timestamp: 0,
+  data: new Float32Array(1024 * 2).buffer
+});
 
-> **copyTo**(`destination`, `options`): `void`
+// Allocate destination buffer
+const size = audioData.allocationSize({ planeIndex: 0 });
+const buffer = new ArrayBuffer(size);
 
-Defined in: [AudioData.ts:165](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L165)
+// Copy first channel's data
+audioData.copyTo(buffer, { planeIndex: 0 });
 
-Copy audio data to a destination buffer
+// Access as Float32Array
+const samples = new Float32Array(buffer);
+console.log(`First sample: ${samples[0]}`);
 
-###### Parameters
+audioData.close();
+```
+</Accordion>
 
-###### destination
+<Accordion title="Example: Copy a portion of audio data">
+```typescript
+// Copy only 512 frames starting at frame 256
+const partialSize = audioData.allocationSize({
+  planeIndex: 0,
+  frameOffset: 256,
+  frameCount: 512
+});
 
-[`BufferSource`](types.mdx#buffersource)
+const partialBuffer = new ArrayBuffer(partialSize);
+audioData.copyTo(partialBuffer, {
+  planeIndex: 0,
+  frameOffset: 256,
+  frameCount: 512
+});
+```
+</Accordion>
 
-###### options
+#### Parameters
 
-[`AudioDataCopyToOptions`](#audiodatacopytooptions)
+<ParamField path="destination" type="BufferSource" required>
+  The destination buffer to copy audio data into. Must be large enough to hold the data.
+</ParamField>
 
-###### Returns
+<ParamField path="options" type="AudioDataCopyToOptions" required>
+  Options specifying which portion of audio to copy.
+</ParamField>
+
+#### Returns
 
 `void`
 
-##### clone()
+---
 
-> **clone**(): [`AudioData`](#audiodata)
+### clone()
 
-Defined in: [AudioData.ts:223](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L223)
+Creates a copy of this AudioData with its own data buffer.
 
-Create a clone of this audio data
+```typescript
+clone(): AudioData
+```
 
-###### Returns
+<Accordion title="Example: Clone audio data">
+```typescript
+const audioData = new AudioData({
+  format: 'f32',
+  sampleRate: 48000,
+  numberOfFrames: 1024,
+  numberOfChannels: 2,
+  timestamp: 0,
+  data: new Float32Array(1024 * 2).buffer
+});
 
-[`AudioData`](#audiodata)
+const cloned = audioData.clone();
 
-##### close()
+// Original and clone are independent
+audioData.close();
 
-> **close**(): `void`
+// Clone is still valid
+console.log(`Cloned format: ${cloned.format}`);
+cloned.close();
+```
+</Accordion>
 
-Defined in: [AudioData.ts:243](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L243)
+#### Returns
 
-Close the audio data and release resources
+`AudioData` - A new AudioData instance with copied data.
 
-###### Returns
+---
+
+### close()
+
+Releases the resources held by this AudioData instance. After calling `close()`, the AudioData is no longer usable.
+
+```typescript
+close(): void
+```
+
+<Accordion title="Example: Proper resource cleanup">
+```typescript
+const audioData = new AudioData({
+  format: 'f32',
+  sampleRate: 48000,
+  numberOfFrames: 1024,
+  numberOfChannels: 2,
+  timestamp: 0,
+  data: new Float32Array(1024 * 2).buffer
+});
+
+// Process audio...
+console.log(`Duration: ${audioData.duration}`);
+
+// Release resources when done
+audioData.close();
+
+// After close(), format returns null
+console.log(`Format after close: ${audioData.format}`); // null
+```
+</Accordion>
+
+#### Returns
 
 `void`
 
@@ -137,82 +312,80 @@ Close the audio data and release resources
 
 ### AudioDataInit
 
-Defined in: [AudioData.ts:18](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L18)
+Configuration object passed to the `AudioData` constructor.
 
-#### Properties
+<ParamField path="format" type="AudioSampleFormat" required>
+  The sample format of the audio data.
+</ParamField>
 
-##### format
+<ParamField path="sampleRate" type="number" required>
+  The sample rate in Hz.
+</ParamField>
 
-> **format**: [`AudioSampleFormat`](#audiosampleformat)
+<ParamField path="numberOfFrames" type="number" required>
+  The number of audio frames.
+</ParamField>
 
-Defined in: [AudioData.ts:19](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L19)
+<ParamField path="numberOfChannels" type="number" required>
+  The number of audio channels.
+</ParamField>
 
-##### sampleRate
+<ParamField path="timestamp" type="number" required>
+  The presentation timestamp in microseconds.
+</ParamField>
 
-> **sampleRate**: `number`
+<ParamField path="data" type="BufferSource" required>
+  The raw audio sample data.
+</ParamField>
 
-Defined in: [AudioData.ts:20](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L20)
-
-##### numberOfFrames
-
-> **numberOfFrames**: `number`
-
-Defined in: [AudioData.ts:21](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L21)
-
-##### numberOfChannels
-
-> **numberOfChannels**: `number`
-
-Defined in: [AudioData.ts:22](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L22)
-
-##### timestamp
-
-> **timestamp**: `number`
-
-Defined in: [AudioData.ts:23](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L23)
-
-##### data
-
-> **data**: [`BufferSource`](types.mdx#buffersource)
-
-Defined in: [AudioData.ts:24](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L24)
-
-***
+---
 
 ### AudioDataCopyToOptions
 
-Defined in: [AudioData.ts:27](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L27)
+Options for the `allocationSize()` and `copyTo()` methods.
 
-#### Properties
+<ParamField path="planeIndex" type="number" required>
+  The index of the plane to copy. For interleaved formats, this is always 0. For planar formats, this is the channel index.
+</ParamField>
 
-##### planeIndex
+<ParamField path="frameOffset" type="number">
+  The offset in frames from the start of the audio data. Defaults to 0.
+</ParamField>
 
-> **planeIndex**: `number`
+<ParamField path="frameCount" type="number">
+  The number of frames to copy. Defaults to all remaining frames from the offset.
+</ParamField>
 
-Defined in: [AudioData.ts:28](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L28)
-
-##### frameOffset?
-
-> `optional` **frameOffset**: `number`
-
-Defined in: [AudioData.ts:29](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L29)
-
-##### frameCount?
-
-> `optional` **frameCount**: `number`
-
-Defined in: [AudioData.ts:30](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L30)
-
-##### format?
-
-> `optional` **format**: [`AudioSampleFormat`](#audiosampleformat)
-
-Defined in: [AudioData.ts:31](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L31)
+<ParamField path="format" type="AudioSampleFormat">
+  Optional target format for conversion during copy. If not specified, uses the source format.
+</ParamField>
 
 ## Type Aliases
 
 ### AudioSampleFormat
 
-> **AudioSampleFormat** = `"u8"` \| `"s16"` \| `"s32"` \| `"f32"` \| `"u8-planar"` \| `"s16-planar"` \| `"s32-planar"` \| `"f32-planar"`
+```typescript
+type AudioSampleFormat =
+  | "u8"
+  | "s16"
+  | "s32"
+  | "f32"
+  | "u8-planar"
+  | "s16-planar"
+  | "s32-planar"
+  | "f32-planar";
+```
 
-Defined in: [AudioData.ts:8](https://github.com/caseymanos/node-webcodecs/blob/master/src/AudioData.ts#L8)
+## See Also
+
+<CardGroup cols={3}>
+  <Card title="AudioEncoder" icon="compress" href="/api-reference/AudioEncoder">
+    Encode raw audio data into compressed formats
+  </Card>
+  <Card title="AudioDecoder" icon="expand" href="/api-reference/AudioDecoder">
+    Decode compressed audio into AudioData
+  </Card>
+  <Card title="EncodedAudioChunk" icon="box" href="/api-reference/EncodedAudioChunk">
+    Container for encoded audio data
+  </Card>
+</CardGroup>

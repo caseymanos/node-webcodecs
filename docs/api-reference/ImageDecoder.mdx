@@ -1,220 +1,508 @@
 ---
 title: "ImageDecoder"
 description: "Decode image files into VideoFrame objects for processing"
+icon: "image"
 ---
 
 # ImageDecoder
 
-## Classes
+The `ImageDecoder` class decodes compressed image data (JPEG, PNG, WebP, GIF, AVIF) into `VideoFrame` objects that can be processed, edited, or re-encoded.
 
-### ImageDecoder
+<Info>
+This implementation follows the [W3C WebCodecs ImageDecoder specification](https://w3c.github.io/webcodecs/#imagedecoder-interface).
+</Info>
 
-Defined in: [ImageDecoder.ts:42](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L42)
+## Quick Example
 
-#### Constructors
+Decode a JPEG or PNG image into a VideoFrame:
 
-##### Constructor
+```typescript
+import { ImageDecoder } from 'node-webcodecs';
+import { readFileSync } from 'fs';
 
-> **new ImageDecoder**(`init`): [`ImageDecoder`](#imagedecoder)
+// Read image file
+const imageData = readFileSync('photo.jpg');
 
-Defined in: [ImageDecoder.ts:62](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L62)
+// Create decoder
+const decoder = new ImageDecoder({
+  data: imageData,
+  type: 'image/jpeg',
+});
 
-###### Parameters
+// Wait for image to be fully parsed
+await decoder.completed;
 
-###### init
+// Decode the image
+const result = await decoder.decode();
+const frame = result.image;
 
-[`ImageDecoderInit`](#imagedecoderinit)
+console.log(`Decoded ${frame.codedWidth}x${frame.codedHeight} image`);
 
-###### Returns
+// Process the frame...
 
-[`ImageDecoder`](#imagedecoder)
+// IMPORTANT: Always close frames when done
+frame.close();
+decoder.close();
+```
 
-#### Accessors
+<Warning>
+**Always call `frame.close()` on decoded images**
 
-##### complete
+Decoded `VideoFrame` objects hold native memory that is not tracked by JavaScript's garbage collector. Forgetting to close frames will cause memory leaks.
 
-###### Get Signature
+```javascript
+// Good
+const result = await decoder.decode();
+processFrame(result.image);
+result.image.close();  // Release memory
 
-> **get** **complete**(): `boolean`
+// Bad - memory leak!
+const result = await decoder.decode();
+processFrame(result.image);
+// Forgot to close!
+```
+</Warning>
 
-Defined in: [ImageDecoder.ts:164](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L164)
+## Supported Formats
 
-Whether all image data has been received
+| Format | MIME Type | Animated |
+|--------|-----------|----------|
+| JPEG | image/jpeg | No |
+| PNG | image/png | No |
+| WebP | image/webp | Yes |
+| GIF | image/gif | Yes |
+| AVIF | image/avif | Yes |
 
-###### Returns
+Use `ImageDecoder.isTypeSupported()` to check format support at runtime.
 
-`boolean`
+## Constructor
 
-##### completed
+```typescript
+new ImageDecoder(init: ImageDecoderInit): ImageDecoder
+```
 
-###### Get Signature
+Creates a new ImageDecoder instance.
 
-> **get** **completed**(): `Promise`\<`void`\>
+### Parameters
 
-Defined in: [ImageDecoder.ts:171](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L171)
+<ParamField path="init" type="ImageDecoderInit" required>
+  Configuration object for the decoder.
 
-Promise that resolves when complete becomes true
+  <Expandable title="ImageDecoderInit properties">
+    <ParamField path="data" type="BufferSource | ReadableStream<BufferSource>" required>
+      The compressed image data. Can be a `Buffer`, `ArrayBuffer`, `TypedArray`, or a `ReadableStream` for progressive loading.
+    </ParamField>
 
-###### Returns
+    <ParamField path="type" type="string" required>
+      The MIME type of the image (e.g., `'image/jpeg'`, `'image/png'`, `'image/webp'`).
+    </ParamField>
 
-`Promise`\<`void`\>
+    <ParamField path="colorSpaceConversion" type="'default' | 'none'" default="'default'">
+      How to handle color space conversion.
+      - `'default'`: Convert to sRGB color space
+      - `'none'`: Keep original color space
+    </ParamField>
 
-##### type
+    <ParamField path="desiredWidth" type="number">
+      Desired output width for scaling. The decoder may scale during decode for efficiency.
+    </ParamField>
 
-###### Get Signature
+    <ParamField path="desiredHeight" type="number">
+      Desired output height for scaling. The decoder may scale during decode for efficiency.
+    </ParamField>
 
-> **get** **type**(): `string`
+    <ParamField path="preferAnimation" type="boolean" default="true">
+      For images with both animated and static representations (like APNG), whether to prefer the animated version.
+    </ParamField>
+  </Expandable>
+</ParamField>
 
-Defined in: [ImageDecoder.ts:178](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L178)
+### Example
 
-The MIME type of the image
+```typescript
+import { ImageDecoder } from 'node-webcodecs';
 
-###### Returns
+// From Buffer
+const decoder = new ImageDecoder({
+  data: imageBuffer,
+  type: 'image/png',
+});
 
-`string`
+// With scaling
+const thumbnailDecoder = new ImageDecoder({
+  data: imageBuffer,
+  type: 'image/jpeg',
+  desiredWidth: 200,
+  desiredHeight: 200,
+});
 
-#### Methods
+// From ReadableStream (progressive loading)
+const streamDecoder = new ImageDecoder({
+  data: readableStream,
+  type: 'image/webp',
+});
+```
 
-##### isTypeSupported()
+## Accessors
 
-> `static` **isTypeSupported**(`type`): `Promise`\<`boolean`\>
+<ResponseField name="complete" type="boolean">
+  Whether all image data has been received and parsed.
 
-Defined in: [ImageDecoder.ts:55](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L55)
+  For images loaded from a `Buffer`, this is `true` immediately after construction.
+  For images loaded from a `ReadableStream`, this becomes `true` when the stream ends.
+</ResponseField>
 
-Check if a MIME type is supported for decoding
+<ResponseField name="completed" type="Promise<void>">
+  A promise that resolves when `complete` becomes `true`.
 
-###### Parameters
+  Use this to wait for the image to be fully loaded before decoding:
 
-###### type
+  ```typescript
+  const decoder = new ImageDecoder({ data: stream, type: 'image/gif' });
+  await decoder.completed;
+  console.log('Image fully loaded, ready to decode');
+  ```
+</ResponseField>
 
-`string`
+<ResponseField name="type" type="string">
+  The MIME type of the image being decoded.
 
-###### Returns
+  ```typescript
+  console.log(decoder.type); // 'image/jpeg'
+  ```
+</ResponseField>
 
-`Promise`\<`boolean`\>
+## Static Methods
 
-##### decode()
+### isTypeSupported()
 
-> **decode**(`options?`): `Promise`\<[`ImageDecodeResult`](#imagedecoderesult)\>
+```typescript
+static isTypeSupported(type: string): Promise<boolean>
+```
 
-Defined in: [ImageDecoder.ts:185](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L185)
+Check if a MIME type is supported for decoding.
 
-Decode an image frame
+<Accordion title="Example: Check format support">
+```typescript
+import { ImageDecoder } from 'node-webcodecs';
 
-###### Parameters
+async function checkSupport() {
+  const formats = ['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif'];
 
-###### options?
+  for (const format of formats) {
+    const supported = await ImageDecoder.isTypeSupported(format);
+    console.log(`${format}: ${supported ? 'Supported' : 'Not supported'}`);
+  }
+}
 
-[`ImageDecodeOptions`](#imagedecodeoptions)
+checkSupport();
+// Output:
+// image/jpeg: Supported
+// image/png: Supported
+// image/webp: Supported
+// image/avif: Supported
+// image/gif: Supported
+```
+</Accordion>
 
-###### Returns
+**Parameters:**
+- `type` (string): The MIME type to check
 
-`Promise`\<[`ImageDecodeResult`](#imagedecoderesult)\>
+**Returns:** `Promise<boolean>` - Resolves to `true` if the format is supported
 
-##### reset()
+## Instance Methods
 
-> **reset**(): `void`
+### decode()
 
-Defined in: [ImageDecoder.ts:213](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L213)
+```typescript
+decode(options?: ImageDecodeOptions): Promise<ImageDecodeResult>
+```
 
-Reset the decoder state
+Decode an image frame.
 
-###### Returns
+<Accordion title="Example: Basic decode">
+```typescript
+const decoder = new ImageDecoder({
+  data: imageBuffer,
+  type: 'image/jpeg',
+});
 
-`void`
+const result = await decoder.decode();
 
-##### close()
+console.log(`Decoded: ${result.image.codedWidth}x${result.image.codedHeight}`);
+console.log(`Complete: ${result.complete}`);
 
-> **close**(): `void`
+result.image.close();
+```
+</Accordion>
 
-Defined in: [ImageDecoder.ts:222](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L222)
+<Accordion title="Example: Animated GIF frame extraction">
+```typescript
+import { ImageDecoder } from 'node-webcodecs';
+import { readFileSync } from 'fs';
+
+async function extractGifFrames(gifPath: string) {
+  const gifData = readFileSync(gifPath);
+
+  const decoder = new ImageDecoder({
+    data: gifData,
+    type: 'image/gif',
+  });
+
+  await decoder.completed;
+
+  const frames = [];
+  let frameIndex = 0;
+
+  while (true) {
+    try {
+      const result = await decoder.decode({ frameIndex });
+
+      // Clone the frame if you need to keep it after decoding more frames
+      const frameClone = result.image.clone();
+      frames.push(frameClone);
+
+      // Close the original
+      result.image.close();
+
+      console.log(`Extracted frame ${frameIndex}: ${frameClone.codedWidth}x${frameClone.codedHeight}`);
+
+      // Check if this was the last frame
+      if (result.complete) {
+        break;
+      }
+
+      frameIndex++;
+    } catch (error) {
+      // No more frames
+      break;
+    }
+  }
 
-Close the decoder and release resources
+  console.log(`Extracted ${frames.length} frames from GIF`);
+
+  // Process frames...
 
-###### Returns
+  // Clean up
+  frames.forEach(frame => frame.close());
+  decoder.close();
 
-`void`
+  return frames.length;
+}
+
+extractGifFrames('animation.gif');
+```
+</Accordion>
+
+<Accordion title="Example: WebP animation processing">
+```typescript
+import { ImageDecoder, VideoEncoder, VideoFrame } from 'node-webcodecs';
+
+async function convertWebpToVideo(webpPath: string, outputPath: string) {
+  const webpData = readFileSync(webpPath);
+
+  const decoder = new ImageDecoder({
+    data: webpData,
+    type: 'image/webp',
+    preferAnimation: true,
+  });
+
+  await decoder.completed;
+
+  // Get first frame to determine dimensions
+  const firstResult = await decoder.decode({ frameIndex: 0 });
+  const { codedWidth, codedHeight } = firstResult.image;
+
+  const chunks: Buffer[] = [];
+  const encoder = new VideoEncoder({
+    output: (chunk) => {
+      const buffer = Buffer.alloc(chunk.byteLength);
+      chunk.copyTo(buffer);
+      chunks.push(buffer);
+    },
+    error: console.error,
+  });
+
+  encoder.configure({
+    codec: 'avc1.42E01E',
+    width: codedWidth,
+    height: codedHeight,
+    bitrate: 2_000_000,
+  });
+
+  // Encode first frame
+  encoder.encode(firstResult.image, { keyFrame: true });
+  firstResult.image.close();
+
+  // Encode remaining frames
+  let frameIndex = 1;
+  while (true) {
+    try {
+      const result = await decoder.decode({ frameIndex });
+      encoder.encode(result.image);
+      result.image.close();
+
+      if (result.complete) break;
+      frameIndex++;
+    } catch {
+      break;
+    }
+  }
+
+  await encoder.flush();
+  encoder.close();
+  decoder.close();
+
+  writeFileSync(outputPath, Buffer.concat(chunks));
+}
+```
+</Accordion>
+
+**Parameters:**
+
+<ParamField path="options" type="ImageDecodeOptions">
+  Optional decode options.
+
+  <Expandable title="ImageDecodeOptions properties">
+    <ParamField path="frameIndex" type="number" default="0">
+      The index of the frame to decode. For static images, this is always `0`. For animated images (GIF, WebP, AVIF), use this to decode specific frames.
+    </ParamField>
+
+    <ParamField path="completeFramesOnly" type="boolean" default="true">
+      Whether to only return complete frames. When `true`, the promise will not resolve until the frame is fully decoded. When `false`, partial frames may be returned for progressive images.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+**Returns:** `Promise<ImageDecodeResult>` - Resolves to an object containing the decoded frame
+
+### reset()
+
+```typescript
+reset(): void
+```
+
+Reset the decoder state. Aborts any pending decode operations.
+
+<Accordion title="Example: Reset and re-decode">
+```typescript
+const decoder = new ImageDecoder({
+  data: imageBuffer,
+  type: 'image/png',
+});
+
+// Decode first frame
+const result1 = await decoder.decode();
+result1.image.close();
+
+// Reset decoder state
+decoder.reset();
+
+// Decode again
+const result2 = await decoder.decode();
+result2.image.close();
+
+decoder.close();
+```
+</Accordion>
+
+**Returns:** `void`
+
+### close()
+
+```typescript
+close(): void
+```
+
+Close the decoder and release all resources. The decoder cannot be used after calling this method.
+
+<Accordion title="Example: Proper cleanup">
+```typescript
+const decoder = new ImageDecoder({
+  data: imageBuffer,
+  type: 'image/jpeg',
+});
+
+try {
+  const result = await decoder.decode();
+  // Process frame...
+  result.image.close();
+} finally {
+  // Always close the decoder
+  decoder.close();
+}
+```
+</Accordion>
+
+**Returns:** `void`
 
 ## Interfaces
 
 ### ImageDecodeResult
 
-Defined in: [ImageDecoder.ts:12](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L12)
+The result of a decode operation.
 
-#### Properties
+<ResponseField name="image" type="VideoFrame" required>
+  The decoded image as a `VideoFrame`. You must call `close()` on this frame when done to release memory.
+</ResponseField>
 
-##### image
-
-> **image**: [`VideoFrame`](VideoFrame.mdx#videoframe)
-
-Defined in: [ImageDecoder.ts:13](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L13)
-
-##### complete
-
-> **complete**: `boolean`
-
-Defined in: [ImageDecoder.ts:14](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L14)
-
-***
+<ResponseField name="complete" type="boolean" required>
+  Whether the image is fully decoded. For animated images, this indicates whether this is the last frame.
+</ResponseField>
 
 ### ImageDecodeOptions
 
-Defined in: [ImageDecoder.ts:17](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L17)
+Options for the `decode()` method.
 
-#### Properties
+<ResponseField name="frameIndex" type="number">
+  The index of the frame to decode (0-based). Defaults to `0`.
+</ResponseField>
 
-##### frameIndex?
-
-> `optional` **frameIndex**: `number`
-
-Defined in: [ImageDecoder.ts:18](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L18)
-
-##### completeFramesOnly?
-
-> `optional` **completeFramesOnly**: `boolean`
-
-Defined in: [ImageDecoder.ts:19](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L19)
-
-***
+<ResponseField name="completeFramesOnly" type="boolean">
+  Whether to only return complete frames. Defaults to `true`.
+</ResponseField>
 
 ### ImageDecoderInit
 
-Defined in: [ImageDecoder.ts:22](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L22)
+Configuration for creating an `ImageDecoder`.
 
-#### Properties
+<ResponseField name="data" type="BufferSource | ReadableStream<BufferSource>" required>
+  The compressed image data.
+</ResponseField>
 
-##### data
+<ResponseField name="type" type="string" required>
+  The MIME type of the image.
+</ResponseField>
 
-> **data**: [`BufferSource`](types.mdx#buffersource) \| `ReadableStream`\<[`BufferSource`](types.mdx#buffersource)\>
+<ResponseField name="colorSpaceConversion" type="'default' | 'none'">
+  Color space conversion mode.
+</ResponseField>
 
-Defined in: [ImageDecoder.ts:23](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L23)
+<ResponseField name="desiredWidth" type="number">
+  Desired output width for scaling.
+</ResponseField>
 
-##### type
+<ResponseField name="desiredHeight" type="number">
+  Desired output height for scaling.
+</ResponseField>
 
-> **type**: `string`
+<ResponseField name="preferAnimation" type="boolean">
+  Whether to prefer animated representation.
+</ResponseField>
 
-Defined in: [ImageDecoder.ts:24](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L24)
+## See Also
 
-##### colorSpaceConversion?
-
-> `optional` **colorSpaceConversion**: `"default"` \| `"none"`
-
-Defined in: [ImageDecoder.ts:25](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L25)
-
-##### desiredWidth?
-
-> `optional` **desiredWidth**: `number`
-
-Defined in: [ImageDecoder.ts:26](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L26)
-
-##### desiredHeight?
-
-> `optional` **desiredHeight**: `number`
-
-Defined in: [ImageDecoder.ts:27](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L27)
-
-##### preferAnimation?
-
-> `optional` **preferAnimation**: `boolean`
-
-Defined in: [ImageDecoder.ts:28](https://github.com/caseymanos/node-webcodecs/blob/master/src/ImageDecoder.ts#L28)
+<CardGroup cols={2}>
+  <Card title="VideoFrame" icon="film" href="/api-reference/VideoFrame">
+    Learn about the VideoFrame class returned by decode()
+  </Card>
+  <Card title="VideoEncoder" icon="clapperboard" href="/api-reference/VideoEncoder">
+    Encode decoded images into video
+  </Card>
+  <Card title="Thumbnail Generation" icon="images" href="/cookbook/thumbnails">
+    Generate thumbnails from images and videos
+  </Card>
+  <Card title="Video Transcoding" icon="shuffle" href="/cookbook/transcode">
+    Complete transcoding workflow
+  </Card>
+</CardGroup>

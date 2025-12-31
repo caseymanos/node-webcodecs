@@ -1,458 +1,604 @@
 ---
 title: "VideoFrame"
 description: "Represents a single video frame with pixel data and metadata"
+icon: "image"
 ---
 
 # VideoFrame
 
-## Classes
-
-### VideoFrame
-
-Defined in: [VideoFrame.ts:62](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L62)
-
-#### Constructors
-
-##### Constructor
-
-> **new VideoFrame**(`data`, `init`): [`VideoFrame`](#videoframe)
-
-Defined in: [VideoFrame.ts:77](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L77)
-
-###### Parameters
-
-###### data
-
-[`BufferSource`](types.mdx#buffersource)
-
-###### init
-
-[`VideoFrameBufferInit`](#videoframebufferinit)
-
-###### Returns
-
-[`VideoFrame`](#videoframe)
-
-##### Constructor
-
-> **new VideoFrame**(`image`, `init?`): [`VideoFrame`](#videoframe)
-
-Defined in: [VideoFrame.ts:78](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L78)
-
-###### Parameters
-
-###### image
-
-[`VideoFrame`](#videoframe)
-
-###### init?
-
-[`VideoFrameInit`](#videoframeinit)
-
-###### Returns
-
-[`VideoFrame`](#videoframe)
-
-#### Properties
-
-##### format
-
-> `readonly` **format**: [`VideoPixelFormat`](#videopixelformat) \| `null`
-
-Defined in: [VideoFrame.ts:67](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L67)
-
-##### codedWidth
-
-> `readonly` **codedWidth**: `number`
-
-Defined in: [VideoFrame.ts:68](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L68)
-
-##### codedHeight
-
-> `readonly` **codedHeight**: `number`
-
-Defined in: [VideoFrame.ts:69](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L69)
-
-##### displayWidth
-
-> `readonly` **displayWidth**: `number`
-
-Defined in: [VideoFrame.ts:70](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L70)
-
-##### displayHeight
-
-> `readonly` **displayHeight**: `number`
-
-Defined in: [VideoFrame.ts:71](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L71)
-
-##### timestamp
-
-> `readonly` **timestamp**: `number`
-
-Defined in: [VideoFrame.ts:72](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L72)
-
-##### duration
-
-> `readonly` **duration**: `number` \| `null`
-
-Defined in: [VideoFrame.ts:73](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L73)
-
-##### colorSpace
-
-> `readonly` **colorSpace**: [`VideoColorSpace`](VideoColorSpace.mdx#videocolorspace)
-
-Defined in: [VideoFrame.ts:74](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L74)
-
-##### visibleRect
-
-> `readonly` **visibleRect**: [`DOMRectReadOnly`](types.mdx#domrectreadonly) \| `null`
-
-Defined in: [VideoFrame.ts:75](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L75)
-
-#### Methods
-
-##### \_getNative()
-
-> **\_getNative**(): `any`
-
-Defined in: [VideoFrame.ts:160](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L160)
-
-Get the native frame handle (internal use only)
-
-###### Returns
-
-`any`
-
-##### allocationSize()
-
-> **allocationSize**(`options?`): `number`
-
-Defined in: [VideoFrame.ts:168](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L168)
-
-Calculate the size in bytes needed to hold the frame data
-
-###### Parameters
-
-###### options?
-
-[`VideoFrameCopyToOptions`](#videoframecopytooptions)
-
-###### Returns
-
-`number`
-
-##### copyTo()
-
-> **copyTo**(`destination`, `options?`): `Promise`\<[`PlaneLayout`](#planelayout)[]\>
-
-Defined in: [VideoFrame.ts:204](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L204)
-
-Copy the frame data to a destination buffer
-
-###### Parameters
-
-###### destination
-
-[`BufferSource`](types.mdx#buffersource)
-
-###### options?
-
-[`VideoFrameCopyToOptions`](#videoframecopytooptions)
-
-###### Returns
-
-`Promise`\<[`PlaneLayout`](#planelayout)[]\>
-
-##### clone()
-
-> **clone**(): [`VideoFrame`](#videoframe)
-
-Defined in: [VideoFrame.ts:233](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L233)
-
-Create a clone of this frame
-
-###### Returns
-
-[`VideoFrame`](#videoframe)
-
-##### close()
-
-> **close**(): `void`
-
-Defined in: [VideoFrame.ts:241](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L241)
-
-Close the frame and release resources
-
-###### Returns
-
-`void`
-
-## Interfaces
+The `VideoFrame` class represents a single frame of video, containing raw pixel data along with timing and layout metadata. VideoFrames can be created from raw pixel buffers or by cloning existing frames.
+
+<Info>
+This class follows the [W3C WebCodecs VideoFrame specification](https://www.w3.org/TR/webcodecs/#videoframe-interface).
+</Info>
+
+<Warning>
+VideoFrames hold significant memory resources. You **must** call `close()` when done with a frame to release its resources. Failing to do so will cause memory leaks.
+</Warning>
+
+## Quick Example
+
+```typescript
+import { VideoFrame } from 'node-webcodecs';
+
+// Create a frame from raw I420 pixel data
+const width = 1920;
+const height = 1080;
+const i420Data = new Uint8Array(width * height * 1.5);  // I420 is 12 bits per pixel
+
+const frame = new VideoFrame(i420Data, {
+  format: 'I420',
+  codedWidth: width,
+  codedHeight: height,
+  timestamp: 0,           // Presentation time in microseconds
+  duration: 33333         // Frame duration (30fps = ~33333us)
+});
+
+// Access frame properties
+console.log(frame.format);        // 'I420'
+console.log(frame.codedWidth);    // 1920
+console.log(frame.codedHeight);   // 1080
+console.log(frame.timestamp);     // 0
+
+// Copy pixel data to a buffer
+const buffer = new Uint8Array(frame.allocationSize());
+await frame.copyTo(buffer);
+
+// Always close when done!
+frame.close();
+```
+
+---
+
+## Constructors
+
+VideoFrame has two constructor overloads: one for creating frames from raw pixel buffers, and one for creating frames from existing VideoFrames.
+
+### From Buffer
+
+Creates a new `VideoFrame` from raw pixel data.
+
+```typescript
+new VideoFrame(data: BufferSource, init: VideoFrameBufferInit)
+```
+
+<ParamField body="data" type="BufferSource" required>
+  The raw pixel data as an `ArrayBuffer` or `TypedArray` (e.g., `Uint8Array`).
+  The data layout must match the specified `format`.
+</ParamField>
+
+<ParamField body="init" type="VideoFrameBufferInit" required>
+  Configuration object for the video frame.
+
+  <Expandable title="VideoFrameBufferInit properties">
+    <ParamField body="format" type="VideoPixelFormat" required>
+      The pixel format of the data. See [Pixel Formats](#pixel-formats) below.
+    </ParamField>
+
+    <ParamField body="codedWidth" type="number" required>
+      Width of the frame in pixels, including any padding.
+    </ParamField>
+
+    <ParamField body="codedHeight" type="number" required>
+      Height of the frame in pixels, including any padding.
+    </ParamField>
+
+    <ParamField body="timestamp" type="number" required>
+      Presentation timestamp in **microseconds**. Determines when the frame should be displayed.
+    </ParamField>
+
+    <ParamField body="duration" type="number">
+      Duration of the frame in **microseconds**. For 30fps video, this is typically `33333` (1/30 second).
+    </ParamField>
+
+    <ParamField body="displayWidth" type="number">
+      Display width in pixels. Defaults to `codedWidth`. Use for non-square pixel aspect ratios.
+    </ParamField>
+
+    <ParamField body="displayHeight" type="number">
+      Display height in pixels. Defaults to `codedHeight`. Use for non-square pixel aspect ratios.
+    </ParamField>
+
+    <ParamField body="visibleRect" type="object">
+      The visible rectangle within the coded frame. Useful for cropping.
+      <Expandable title="visibleRect properties">
+        <ParamField body="x" type="number" required>
+          X offset of the visible region.
+        </ParamField>
+        <ParamField body="y" type="number" required>
+          Y offset of the visible region.
+        </ParamField>
+        <ParamField body="width" type="number" required>
+          Width of the visible region.
+        </ParamField>
+        <ParamField body="height" type="number" required>
+          Height of the visible region.
+        </ParamField>
+      </Expandable>
+    </ParamField>
+
+    <ParamField body="colorSpace" type="VideoColorSpaceInit">
+      Color space information for the frame. See [VideoColorSpace](/api-reference/VideoColorSpace).
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### From Existing Frame
+
+Creates a new `VideoFrame` by cloning an existing frame with optional modifications.
+
+```typescript
+new VideoFrame(image: VideoFrame, init?: VideoFrameInit)
+```
+
+<ParamField body="image" type="VideoFrame" required>
+  An existing `VideoFrame` to copy. The source frame's data and metadata are copied.
+</ParamField>
+
+<ParamField body="init" type="VideoFrameInit">
+  Optional configuration to override properties from the source frame.
+
+  <Expandable title="VideoFrameInit properties">
+    <ParamField body="timestamp" type="number" required>
+      Presentation timestamp in **microseconds**.
+    </ParamField>
+
+    <ParamField body="duration" type="number">
+      Duration of the frame in **microseconds**.
+    </ParamField>
+
+    <ParamField body="format" type="VideoPixelFormat">
+      Override the pixel format.
+    </ParamField>
+
+    <ParamField body="codedWidth" type="number">
+      Override the coded width.
+    </ParamField>
+
+    <ParamField body="codedHeight" type="number">
+      Override the coded height.
+    </ParamField>
+
+    <ParamField body="displayWidth" type="number">
+      Override the display width.
+    </ParamField>
+
+    <ParamField body="displayHeight" type="number">
+      Override the display height.
+    </ParamField>
+
+    <ParamField body="visibleRect" type="object">
+      Override the visible rectangle.
+      <Expandable title="visibleRect properties">
+        <ParamField body="x" type="number" required>
+          X offset of the visible region.
+        </ParamField>
+        <ParamField body="y" type="number" required>
+          Y offset of the visible region.
+        </ParamField>
+        <ParamField body="width" type="number" required>
+          Width of the visible region.
+        </ParamField>
+        <ParamField body="height" type="number" required>
+          Height of the visible region.
+        </ParamField>
+      </Expandable>
+    </ParamField>
+
+    <ParamField body="colorSpace" type="VideoColorSpaceInit">
+      Override the color space information.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+---
+
+## Properties
+
+All properties are **readonly** after construction.
+
+<ResponseField name="format" type="VideoPixelFormat | null" required>
+  The pixel format of the frame data (e.g., `'I420'`, `'NV12'`, `'RGBA'`).
+  See [Pixel Formats](#pixel-formats) for all supported formats.
+</ResponseField>
+
+<ResponseField name="codedWidth" type="number" required>
+  Width of the frame in pixels, including any codec-required padding.
+  May be larger than `displayWidth`.
+</ResponseField>
+
+<ResponseField name="codedHeight" type="number" required>
+  Height of the frame in pixels, including any codec-required padding.
+  May be larger than `displayHeight`.
+</ResponseField>
+
+<ResponseField name="displayWidth" type="number" required>
+  Width the frame should be displayed at, accounting for pixel aspect ratio.
+  Use this for rendering.
+</ResponseField>
+
+<ResponseField name="displayHeight" type="number" required>
+  Height the frame should be displayed at, accounting for pixel aspect ratio.
+  Use this for rendering.
+</ResponseField>
+
+<ResponseField name="timestamp" type="number" required>
+  Presentation timestamp in microseconds. Determines when this frame should be
+  displayed relative to the start of the video.
+</ResponseField>
+
+<ResponseField name="duration" type="number | null" required>
+  Duration of this frame in microseconds, or `null` if not specified during construction.
+</ResponseField>
+
+<ResponseField name="colorSpace" type="VideoColorSpace" required>
+  Color space information for the frame, including primaries, transfer characteristics,
+  and matrix coefficients. See [VideoColorSpace](/api-reference/VideoColorSpace).
+</ResponseField>
+
+<ResponseField name="visibleRect" type="DOMRectReadOnly | null" required>
+  The visible portion of the frame. This defines the crop region that should be displayed.
+  Contains `x`, `y`, `width`, and `height` properties.
+</ResponseField>
+
+---
+
+## Methods
+
+### allocationSize()
+
+Calculates the number of bytes needed to hold the frame's pixel data.
+
+```typescript
+frame.allocationSize(options?: VideoFrameCopyToOptions): number
+```
+
+<ParamField body="options" type="VideoFrameCopyToOptions">
+  Optional configuration for the allocation calculation.
+
+  <Expandable title="VideoFrameCopyToOptions properties">
+    <ParamField body="rect" type="object">
+      Copy only a specific rectangular region.
+      <Expandable title="rect properties">
+        <ParamField body="x" type="number" required>X offset</ParamField>
+        <ParamField body="y" type="number" required>Y offset</ParamField>
+        <ParamField body="width" type="number" required>Width</ParamField>
+        <ParamField body="height" type="number" required>Height</ParamField>
+      </Expandable>
+    </ParamField>
+
+    <ParamField body="layout" type="PlaneLayout[]">
+      Custom layout for the output planes.
+    </ParamField>
+
+    <ParamField body="format" type="VideoPixelFormat">
+      Convert to a different pixel format when copying.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+**Returns:** `number` - The size in bytes needed for the buffer.
+
+<Accordion title="Example: Calculate buffer size">
+```typescript
+const frame = new VideoFrame(data, {
+  format: 'I420',
+  codedWidth: 1920,
+  codedHeight: 1080,
+  timestamp: 0
+});
+
+// Full frame size
+const fullSize = frame.allocationSize();
+console.log(`Full frame: ${fullSize} bytes`);  // ~3,110,400 bytes for I420
+
+// Size for a cropped region
+const cropSize = frame.allocationSize({
+  rect: { x: 0, y: 0, width: 640, height: 480 }
+});
+console.log(`Cropped: ${cropSize} bytes`);
+
+frame.close();
+```
+</Accordion>
+
+---
+
+### copyTo()
+
+Copies the frame's pixel data to a destination buffer.
+
+```typescript
+frame.copyTo(destination: BufferSource, options?: VideoFrameCopyToOptions): Promise<PlaneLayout[]>
+```
+
+<ParamField body="destination" type="BufferSource" required>
+  An `ArrayBuffer` or `TypedArray` to copy the data into. Must have at least `allocationSize()` bytes available.
+</ParamField>
+
+<ParamField body="options" type="VideoFrameCopyToOptions">
+  Optional configuration for the copy operation. See `allocationSize()` for options.
+</ParamField>
+
+**Returns:** `Promise<PlaneLayout[]>` - Layout information for each plane in the output buffer.
+
+<Accordion title="Example: Copy frame data">
+```typescript
+const frame = new VideoFrame(data, {
+  format: 'I420',
+  codedWidth: 1920,
+  codedHeight: 1080,
+  timestamp: 0
+});
+
+// Allocate buffer with exact size needed
+const buffer = new Uint8Array(frame.allocationSize());
+const layout = await frame.copyTo(buffer);
+
+// Layout describes where each plane is in the buffer
+console.log('Y plane:', layout[0]);  // { offset: 0, stride: 1920 }
+console.log('U plane:', layout[1]);  // { offset: 2073600, stride: 960 }
+console.log('V plane:', layout[2]);  // { offset: 2592000, stride: 960 }
+
+frame.close();
+```
+</Accordion>
+
+---
+
+### clone()
+
+Creates an independent copy of this frame.
+
+```typescript
+frame.clone(): VideoFrame
+```
+
+**Returns:** `VideoFrame` - A new VideoFrame with the same data and metadata.
+
+<Warning>
+Both the original and cloned frames must be closed independently. Cloning does not share resources.
+</Warning>
+
+<Accordion title="Example: Clone a frame">
+```typescript
+const original = new VideoFrame(data, {
+  format: 'RGBA',
+  codedWidth: 1920,
+  codedHeight: 1080,
+  timestamp: 0
+});
+
+// Create an independent copy
+const cloned = original.clone();
+
+// Close original - cloned frame is still valid
+original.close();
+
+// Use the cloned frame
+console.log(cloned.codedWidth);  // 1920
+
+// Don't forget to close the clone too!
+cloned.close();
+```
+</Accordion>
+
+---
+
+### close()
+
+Releases the resources held by this frame. After calling `close()`, the frame becomes unusable.
+
+```typescript
+frame.close(): void
+```
+
+<Warning>
+Always call `close()` when you're done with a VideoFrame. Failure to do so will cause memory leaks, as video frames can hold significant amounts of pixel data.
+</Warning>
+
+<Accordion title="Example: Proper resource management">
+```typescript
+const frame = new VideoFrame(data, {
+  format: 'I420',
+  codedWidth: 1920,
+  codedHeight: 1080,
+  timestamp: 0
+});
+
+try {
+  // Use the frame
+  await processFrame(frame);
+} finally {
+  // Always close in a finally block
+  frame.close();
+}
+```
+</Accordion>
+
+---
+
+## Pixel Formats
+
+VideoFrame supports the following pixel formats:
+
+| Format | Description |
+|--------|-------------|
+| `I420` | YUV 4:2:0 planar (most common) |
+| `I420A` | I420 with alpha plane |
+| `I422` | YUV 4:2:2 planar |
+| `I444` | YUV 4:4:4 planar |
+| `NV12` | YUV 4:2:0 semi-planar |
+| `RGBA` | 32-bit RGBA interleaved |
+| `RGBX` | 32-bit RGB (alpha ignored) |
+| `BGRA` | 32-bit BGRA interleaved |
+| `BGRX` | 32-bit BGR (alpha ignored) |
+
+```typescript
+type VideoPixelFormat =
+  | 'I420'   // Y, U, V planes (most efficient for encoding)
+  | 'I420A'  // Y, U, V, A planes
+  | 'I422'   // Y, U, V planes (higher chroma resolution)
+  | 'I444'   // Y, U, V planes (full chroma resolution)
+  | 'NV12'   // Y plane, interleaved UV plane
+  | 'RGBA'   // Red, Green, Blue, Alpha interleaved
+  | 'RGBX'   // Red, Green, Blue, padding interleaved
+  | 'BGRA'   // Blue, Green, Red, Alpha interleaved
+  | 'BGRX';  // Blue, Green, Red, padding interleaved
+```
+
+---
+
+## Type Definitions
 
 ### PlaneLayout
 
-Defined in: [VideoFrame.ts:20](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L20)
+Describes the layout of a single plane in a pixel buffer.
 
-#### Properties
-
-##### offset
-
-> **offset**: `number`
-
-Defined in: [VideoFrame.ts:21](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L21)
-
-##### stride
-
-> **stride**: `number`
-
-Defined in: [VideoFrame.ts:22](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L22)
-
-***
+```typescript
+interface PlaneLayout {
+  offset: number;  // Byte offset of the plane in the buffer
+  stride: number;  // Number of bytes per row
+}
+```
 
 ### VideoFrameInit
 
-Defined in: [VideoFrame.ts:25](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L25)
+Configuration for creating a VideoFrame from an existing frame.
 
-#### Extended by
-
-- [`VideoFrameBufferInit`](#videoframebufferinit)
-
-#### Properties
-
-##### timestamp
-
-> **timestamp**: `number`
-
-Defined in: [VideoFrame.ts:26](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L26)
-
-##### duration?
-
-> `optional` **duration**: `number`
-
-Defined in: [VideoFrame.ts:27](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L27)
-
-##### format?
-
-> `optional` **format**: [`VideoPixelFormat`](#videopixelformat)
-
-Defined in: [VideoFrame.ts:28](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L28)
-
-##### codedWidth?
-
-> `optional` **codedWidth**: `number`
-
-Defined in: [VideoFrame.ts:29](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L29)
-
-##### codedHeight?
-
-> `optional` **codedHeight**: `number`
-
-Defined in: [VideoFrame.ts:30](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L30)
-
-##### displayWidth?
-
-> `optional` **displayWidth**: `number`
-
-Defined in: [VideoFrame.ts:31](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L31)
-
-##### displayHeight?
-
-> `optional` **displayHeight**: `number`
-
-Defined in: [VideoFrame.ts:32](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L32)
-
-##### visibleRect?
-
-> `optional` **visibleRect**: `object`
-
-Defined in: [VideoFrame.ts:33](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L33)
-
-###### x
-
-> **x**: `number`
-
-###### y
-
-> **y**: `number`
-
-###### width
-
-> **width**: `number`
-
-###### height
-
-> **height**: `number`
-
-##### colorSpace?
-
-> `optional` **colorSpace**: [`VideoColorSpaceInit`](VideoColorSpace.mdx#videocolorspaceinit)
-
-Defined in: [VideoFrame.ts:39](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L39)
-
-***
+```typescript
+interface VideoFrameInit {
+  timestamp: number;                    // Required: microseconds
+  duration?: number;                    // Optional: microseconds
+  format?: VideoPixelFormat;            // Optional: pixel format
+  codedWidth?: number;                  // Optional: coded width
+  codedHeight?: number;                 // Optional: coded height
+  displayWidth?: number;                // Optional: display width
+  displayHeight?: number;               // Optional: display height
+  visibleRect?: {                       // Optional: visible region
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  colorSpace?: VideoColorSpaceInit;     // Optional: color space
+}
+```
 
 ### VideoFrameBufferInit
 
-Defined in: [VideoFrame.ts:42](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L42)
+Configuration for creating a VideoFrame from raw pixel data.
 
-#### Extends
-
-- [`VideoFrameInit`](#videoframeinit)
-
-#### Properties
-
-##### timestamp
-
-> **timestamp**: `number`
-
-Defined in: [VideoFrame.ts:26](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L26)
-
-###### Inherited from
-
-[`VideoFrameInit`](#videoframeinit).[`timestamp`](#timestamp)
-
-##### duration?
-
-> `optional` **duration**: `number`
-
-Defined in: [VideoFrame.ts:27](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L27)
-
-###### Inherited from
-
-[`VideoFrameInit`](#videoframeinit).[`duration`](#duration)
-
-##### displayWidth?
-
-> `optional` **displayWidth**: `number`
-
-Defined in: [VideoFrame.ts:31](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L31)
-
-###### Inherited from
-
-[`VideoFrameInit`](#videoframeinit).[`displayWidth`](#displaywidth)
-
-##### displayHeight?
-
-> `optional` **displayHeight**: `number`
-
-Defined in: [VideoFrame.ts:32](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L32)
-
-###### Inherited from
-
-[`VideoFrameInit`](#videoframeinit).[`displayHeight`](#displayheight)
-
-##### visibleRect?
-
-> `optional` **visibleRect**: `object`
-
-Defined in: [VideoFrame.ts:33](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L33)
-
-###### x
-
-> **x**: `number`
-
-###### y
-
-> **y**: `number`
-
-###### width
-
-> **width**: `number`
-
-###### height
-
-> **height**: `number`
-
-###### Inherited from
-
-[`VideoFrameInit`](#videoframeinit).[`visibleRect`](#visiblerect)
-
-##### colorSpace?
-
-> `optional` **colorSpace**: [`VideoColorSpaceInit`](VideoColorSpace.mdx#videocolorspaceinit)
-
-Defined in: [VideoFrame.ts:39](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L39)
-
-###### Inherited from
-
-[`VideoFrameInit`](#videoframeinit).[`colorSpace`](#colorspace)
-
-##### format
-
-> **format**: [`VideoPixelFormat`](#videopixelformat)
-
-Defined in: [VideoFrame.ts:43](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L43)
-
-###### Overrides
-
-[`VideoFrameInit`](#videoframeinit).[`format`](#format)
-
-##### codedWidth
-
-> **codedWidth**: `number`
-
-Defined in: [VideoFrame.ts:44](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L44)
-
-###### Overrides
-
-[`VideoFrameInit`](#videoframeinit).[`codedWidth`](#codedwidth)
-
-##### codedHeight
-
-> **codedHeight**: `number`
-
-Defined in: [VideoFrame.ts:45](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L45)
-
-###### Overrides
-
-[`VideoFrameInit`](#videoframeinit).[`codedHeight`](#codedheight)
-
-***
+```typescript
+interface VideoFrameBufferInit extends VideoFrameInit {
+  format: VideoPixelFormat;   // Required: pixel format
+  codedWidth: number;         // Required: coded width
+  codedHeight: number;        // Required: coded height
+}
+```
 
 ### VideoFrameCopyToOptions
 
-Defined in: [VideoFrame.ts:48](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L48)
+Options for `allocationSize()` and `copyTo()` methods.
 
-#### Properties
+```typescript
+interface VideoFrameCopyToOptions {
+  rect?: {                    // Optional: copy only this region
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  layout?: PlaneLayout[];     // Optional: custom output layout
+  format?: VideoPixelFormat;  // Optional: convert to this format
+}
+```
 
-##### rect?
+---
 
-> `optional` **rect**: `object`
+## Usage with VideoEncoder
 
-Defined in: [VideoFrame.ts:49](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L49)
+VideoFrames are typically passed to `VideoEncoder.encode()` for compression:
 
-###### x
+```typescript
+import { VideoEncoder, VideoFrame } from 'node-webcodecs';
 
-> **x**: `number`
+const encoder = new VideoEncoder({
+  output: (chunk, metadata) => {
+    console.log(`Encoded ${chunk.type} frame: ${chunk.byteLength} bytes`);
+  },
+  error: (e) => console.error('Encoding error:', e)
+});
 
-###### y
+encoder.configure({
+  codec: 'avc1.42001f',  // H.264 Baseline
+  width: 1920,
+  height: 1080,
+  bitrate: 5_000_000
+});
 
-> **y**: `number`
+// Create and encode frames
+for (let i = 0; i < 60; i++) {
+  const frame = new VideoFrame(pixelData, {
+    format: 'I420',
+    codedWidth: 1920,
+    codedHeight: 1080,
+    timestamp: i * 33333  // 30fps
+  });
 
-###### width
+  encoder.encode(frame);
+  frame.close();  // Close after encoding
+}
 
-> **width**: `number`
+await encoder.flush();
+```
 
-###### height
+## Usage with VideoDecoder
 
-> **height**: `number`
+VideoFrames are produced by `VideoDecoder` when decoding encoded chunks:
 
-##### layout?
+```typescript
+import { VideoDecoder, EncodedVideoChunk } from 'node-webcodecs';
 
-> `optional` **layout**: [`PlaneLayout`](#planelayout)[]
+const decoder = new VideoDecoder({
+  output: (frame) => {
+    console.log(`Decoded: ${frame.codedWidth}x${frame.codedHeight} ${frame.format}`);
 
-Defined in: [VideoFrame.ts:55](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L55)
+    // Copy pixel data for processing
+    const buffer = new Uint8Array(frame.allocationSize());
+    frame.copyTo(buffer);
 
-##### format?
+    // Always close the frame when done!
+    frame.close();
+  },
+  error: (e) => console.error('Decoding error:', e)
+});
 
-> `optional` **format**: [`VideoPixelFormat`](#videopixelformat)
+decoder.configure({
+  codec: 'avc1.42001f',
+  codedWidth: 1920,
+  codedHeight: 1080
+});
 
-Defined in: [VideoFrame.ts:56](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L56)
+decoder.decode(encodedChunk);
+await decoder.flush();
+```
 
-## Type Aliases
+---
 
-### VideoPixelFormat
+## See Also
 
-> **VideoPixelFormat** = `"I420"` \| `"I420A"` \| `"I422"` \| `"I444"` \| `"NV12"` \| `"RGBA"` \| `"RGBX"` \| `"BGRA"` \| `"BGRX"`
-
-Defined in: [VideoFrame.ts:9](https://github.com/caseymanos/node-webcodecs/blob/master/src/VideoFrame.ts#L9)
+<CardGroup cols={2}>
+  <Card title="VideoEncoder" icon="video" href="/api-reference/VideoEncoder">
+    Encodes VideoFrames into compressed video chunks
+  </Card>
+  <Card title="VideoDecoder" icon="film" href="/api-reference/VideoDecoder">
+    Decodes compressed video chunks into VideoFrames
+  </Card>
+  <Card title="VideoColorSpace" icon="palette" href="/api-reference/VideoColorSpace">
+    Color space metadata for video frames
+  </Card>
+  <Card title="EncodedVideoChunk" icon="file-video" href="/api-reference/EncodedVideoChunk">
+    Represents compressed video data
+  </Card>
+</CardGroup>
