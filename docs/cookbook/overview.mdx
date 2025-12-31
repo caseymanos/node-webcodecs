@@ -147,7 +147,7 @@ This cookbook provides practical, production-ready recipes for common video enco
   <Tab title="Read Video File">
     ```javascript
     const fs = require('fs');
-    const { VideoDecoder } = require('node-webcodecs');
+    const { VideoDecoder, EncodedVideoChunk } = require('node-webcodecs');
 
     // Read encoded video file
     const videoData = fs.readFileSync('input.h264');
