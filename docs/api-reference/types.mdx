@@ -40,7 +40,7 @@ type BufferSource = ArrayBuffer | ArrayBufferView
 ### Examples
 
 ```typescript
-import { VideoDecoder } from '@aspect/aspect-webcodecs-polyfill';
+import { VideoDecoder, EncodedVideoChunk, AudioData } from 'node-webcodecs';
 
 // Using Uint8Array (most common)
 const chunk = new EncodedVideoChunk({
@@ -249,7 +249,7 @@ The following table lists the error codes most frequently encountered when using
 ### Error Handling Example
 
 ```typescript
-import { VideoDecoder, WebCodecsDOMException } from '@aspect/aspect-webcodecs-polyfill';
+import { VideoDecoder, WebCodecsDOMException } from 'node-webcodecs';
 
 const decoder = new VideoDecoder({
   output: (frame) => frame.close(),
@@ -348,7 +348,7 @@ toJSON(): { x: number; y: number; width: number; height: number }
 ### Usage Example
 
 ```typescript
-import { VideoFrame } from '@aspect/aspect-webcodecs-polyfill';
+import { VideoFrame } from 'node-webcodecs';
 
 // Create a video frame
 const frame = new VideoFrame(imageData, {
@@ -412,16 +412,16 @@ const DOMException = WebCodecsDOMException
 ## See Also
 
 <CardGroup cols={2}>
-  <Card title="VideoEncoder" icon="film" href="/api-reference/video-encoder">
+  <Card title="VideoEncoder" icon="film" href="/api-reference/VideoEncoder">
     Encode raw video frames to compressed chunks
   </Card>
-  <Card title="VideoDecoder" icon="play" href="/api-reference/video-decoder">
+  <Card title="VideoDecoder" icon="play" href="/api-reference/VideoDecoder">
     Decode compressed video to raw frames
   </Card>
-  <Card title="AudioEncoder" icon="microphone" href="/api-reference/audio-encoder">
+  <Card title="AudioEncoder" icon="microphone" href="/api-reference/AudioEncoder">
     Encode raw audio samples to compressed data
   </Card>
-  <Card title="AudioDecoder" icon="volume-high" href="/api-reference/audio-decoder">
+  <Card title="AudioDecoder" icon="volume-high" href="/api-reference/AudioDecoder">
     Decode compressed audio to raw samples
   </Card>
 </CardGroup>
