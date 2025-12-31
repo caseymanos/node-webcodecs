@@ -1,116 +1,247 @@
 ---
 title: "EncodedVideoChunk"
-description: "Represents a chunk of encoded video data (keyframe or delta)"
+description: "Represents a chunk of encoded video data (keyframe or delta frame)"
+icon: "film"
 ---
 
 # EncodedVideoChunk
 
-## Classes
+The `EncodedVideoChunk` class represents a single chunk of encoded video data. Each chunk is either a **keyframe** (can be decoded independently) or a **delta frame** (requires previous frames to decode).
 
-### EncodedVideoChunk
+<Info>
+This class follows the [W3C WebCodecs EncodedVideoChunk specification](https://www.w3.org/TR/webcodecs/#encodedvideochunk-interface).
+</Info>
 
-Defined in: [EncodedVideoChunk.ts:17](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedVideoChunk.ts#L17)
+## Quick Example
 
-#### Constructors
+```typescript
+import { EncodedVideoChunk } from 'node-webcodecs';
 
-##### Constructor
+// Create from encoded H.264 data
+const chunk = new EncodedVideoChunk({
+  type: 'key',           // 'key' for keyframe, 'delta' for P/B frames
+  timestamp: 0,          // Presentation time in microseconds
+  duration: 33333,       // Frame duration in microseconds (30fps = ~33333μs)
+  data: encodedH264Data  // Uint8Array or ArrayBuffer
+});
 
-> **new EncodedVideoChunk**(`init`): [`EncodedVideoChunk`](#encodedvideochunk)
+// Access properties
+console.log(chunk.type);       // 'key'
+console.log(chunk.timestamp);  // 0
+console.log(chunk.byteLength); // Size of encoded data
 
-Defined in: [EncodedVideoChunk.ts:25](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedVideoChunk.ts#L25)
+// Copy data to another buffer
+const buffer = new Uint8Array(chunk.byteLength);
+chunk.copyTo(buffer);
+```
 
-###### Parameters
+---
 
-###### init
+## Constructor
 
-[`EncodedVideoChunkInit`](#encodedvideochunkinit)
+Creates a new `EncodedVideoChunk` from initialization data.
 
-###### Returns
+```typescript
+new EncodedVideoChunk(init: EncodedVideoChunkInit)
+```
 
-[`EncodedVideoChunk`](#encodedvideochunk)
+<ParamField body="init" type="EncodedVideoChunkInit" required>
+  Configuration object for the encoded chunk.
 
-#### Properties
+  <Expandable title="EncodedVideoChunkInit properties">
+    <ParamField body="type" type="'key' | 'delta'" required>
+      The frame type. Use `'key'` for keyframes (I-frames) that can be decoded independently,
+      or `'delta'` for frames that depend on previous frames (P/B-frames).
+    </ParamField>
 
-##### type
+    <ParamField body="timestamp" type="number" required>
+      Presentation timestamp in **microseconds**. This determines when the frame should be displayed.
+    </ParamField>
 
-> `readonly` **type**: [`EncodedVideoChunkType`](#encodedvideochunktype)
+    <ParamField body="duration" type="number">
+      Duration of the frame in **microseconds**. For 30fps video, this is typically `33333` (1/30 second).
+    </ParamField>
 
-Defined in: [EncodedVideoChunk.ts:20](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedVideoChunk.ts#L20)
+    <ParamField body="data" type="BufferSource" required>
+      The encoded video data as an `ArrayBuffer` or `TypedArray` (e.g., `Uint8Array`).
+      The data is copied internally, so you can reuse the source buffer.
+    </ParamField>
+  </Expandable>
+</ParamField>
 
-##### timestamp
+<Warning>
+The `type` must be exactly `'key'` or `'delta'`. Any other value will throw a `TypeError`.
+</Warning>
 
-> `readonly` **timestamp**: `number`
+---
 
-Defined in: [EncodedVideoChunk.ts:21](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedVideoChunk.ts#L21)
+## Properties
 
-##### duration
+All properties are **readonly** after construction.
 
-> `readonly` **duration**: `number` \| `null`
+<ResponseField name="type" type="'key' | 'delta'" required>
+  The chunk type indicating whether this is a keyframe or delta frame.
 
-Defined in: [EncodedVideoChunk.ts:22](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedVideoChunk.ts#L22)
+  - `'key'` - Keyframe (I-frame) that can be decoded without any other frames
+  - `'delta'` - Delta frame (P/B-frame) that requires previous frames
+</ResponseField>
 
-##### byteLength
+<ResponseField name="timestamp" type="number" required>
+  Presentation timestamp in microseconds. Determines when this frame should be displayed
+  relative to the start of the video.
+</ResponseField>
 
-> `readonly` **byteLength**: `number`
+<ResponseField name="duration" type="number | null" required>
+  Duration of this frame in microseconds, or `null` if not specified during construction.
+</ResponseField>
 
-Defined in: [EncodedVideoChunk.ts:23](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedVideoChunk.ts#L23)
+<ResponseField name="byteLength" type="number" required>
+  Size of the encoded data in bytes. Use this to allocate a buffer for `copyTo()`.
+</ResponseField>
 
-#### Methods
+---
 
-##### copyTo()
+## Methods
 
-> **copyTo**(`destination`): `void`
+### copyTo()
 
-Defined in: [EncodedVideoChunk.ts:62](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedVideoChunk.ts#L62)
+Copies the encoded video data to a destination buffer.
 
-Copy the encoded data to a destination buffer
+```typescript
+chunk.copyTo(destination: BufferSource): void
+```
 
-###### Parameters
+<ParamField body="destination" type="BufferSource" required>
+  An `ArrayBuffer` or `TypedArray` to copy the data into. Must have at least `byteLength` bytes available.
+</ParamField>
 
-###### destination
+**Throws:** `TypeError` if the destination buffer is smaller than `byteLength`.
 
-[`BufferSource`](types.mdx#buffersource)
+<Accordion title="Example: Copying chunk data">
+```typescript
+const chunk = new EncodedVideoChunk({
+  type: 'key',
+  timestamp: 0,
+  data: someEncodedData
+});
 
-###### Returns
+// Allocate buffer with exact size needed
+const buffer = new Uint8Array(chunk.byteLength);
+chunk.copyTo(buffer);
 
-`void`
+// Now buffer contains a copy of the encoded data
+console.log(`Copied ${buffer.length} bytes`);
+```
+</Accordion>
 
-## Interfaces
+---
 
-### EncodedVideoChunkInit
-
-Defined in: [EncodedVideoChunk.ts:10](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedVideoChunk.ts#L10)
-
-#### Properties
-
-##### type
-
-> **type**: [`EncodedVideoChunkType`](#encodedvideochunktype)
-
-Defined in: [EncodedVideoChunk.ts:11](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedVideoChunk.ts#L11)
-
-##### timestamp
-
-> **timestamp**: `number`
-
-Defined in: [EncodedVideoChunk.ts:12](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedVideoChunk.ts#L12)
-
-##### duration?
-
-> `optional` **duration**: `number`
-
-Defined in: [EncodedVideoChunk.ts:13](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedVideoChunk.ts#L13)
-
-##### data
-
-> **data**: [`BufferSource`](types.mdx#buffersource)
-
-Defined in: [EncodedVideoChunk.ts:14](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedVideoChunk.ts#L14)
-
-## Type Aliases
+## Type Definitions
 
 ### EncodedVideoChunkType
 
-> **EncodedVideoChunkType** = `"key"` \| `"delta"`
+```typescript
+type EncodedVideoChunkType = 'key' | 'delta';
+```
 
-Defined in: [EncodedVideoChunk.ts:8](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedVideoChunk.ts#L8)
+| Value | Description |
+|-------|-------------|
+| `'key'` | Keyframe (I-frame) - can be decoded independently |
+| `'delta'` | Delta frame (P/B-frame) - requires reference frames |
+
+### EncodedVideoChunkInit
+
+```typescript
+interface EncodedVideoChunkInit {
+  type: EncodedVideoChunkType;  // Required: 'key' or 'delta'
+  timestamp: number;            // Required: microseconds
+  duration?: number;            // Optional: microseconds
+  data: BufferSource;           // Required: encoded data
+}
+```
+
+---
+
+## Usage with VideoEncoder
+
+`EncodedVideoChunk` objects are typically created by `VideoEncoder` and passed to your output callback:
+
+```typescript
+import { VideoEncoder, VideoFrame } from 'node-webcodecs';
+
+const encoder = new VideoEncoder({
+  output: (chunk, metadata) => {
+    // chunk is an EncodedVideoChunk
+    console.log(`Got ${chunk.type} frame at ${chunk.timestamp}μs`);
+    console.log(`Size: ${chunk.byteLength} bytes`);
+
+    // Copy to your own buffer for storage/transmission
+    const data = new Uint8Array(chunk.byteLength);
+    chunk.copyTo(data);
+
+    // First keyframe includes decoder config in metadata
+    if (metadata?.decoderConfig) {
+      console.log('Decoder config:', metadata.decoderConfig);
+    }
+  },
+  error: (e) => console.error('Encoding error:', e)
+});
+
+encoder.configure({
+  codec: 'avc1.42001f',  // H.264 Baseline
+  width: 1920,
+  height: 1080,
+  bitrate: 5_000_000
+});
+```
+
+## Usage with VideoDecoder
+
+Pass `EncodedVideoChunk` objects to `VideoDecoder.decode()`:
+
+```typescript
+import { VideoDecoder, EncodedVideoChunk } from 'node-webcodecs';
+
+const decoder = new VideoDecoder({
+  output: (frame) => {
+    console.log(`Decoded frame: ${frame.codedWidth}x${frame.codedHeight}`);
+    frame.close();  // Don't forget to close frames!
+  },
+  error: (e) => console.error('Decoding error:', e)
+});
+
+decoder.configure({
+  codec: 'avc1.42001f',
+  codedWidth: 1920,
+  codedHeight: 1080
+});
+
+// Decode a chunk
+const chunk = new EncodedVideoChunk({
+  type: 'key',
+  timestamp: 0,
+  data: h264KeyframeData
+});
+
+decoder.decode(chunk);
+await decoder.flush();
+```
+
+---
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="EncodedAudioChunk" icon="music" href="/api-reference/EncodedAudioChunk">
+    The audio equivalent for encoded audio data
+  </Card>
+  <Card title="VideoEncoder" icon="video" href="/api-reference/VideoEncoder">
+    Encodes VideoFrames into EncodedVideoChunks
+  </Card>
+  <Card title="VideoDecoder" icon="film" href="/api-reference/VideoDecoder">
+    Decodes EncodedVideoChunks into VideoFrames
+  </Card>
+  <Card title="VideoFrame" icon="image" href="/api-reference/VideoFrame">
+    Raw video frame data
+  </Card>
+</CardGroup>

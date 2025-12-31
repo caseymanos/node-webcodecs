@@ -1,11 +1,19 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
+  "theme": "maple",
   "name": "node-webcodecs",
   "colors": {
     "primary": "#00ffc8",
     "light": "#4dabf7",
     "dark": "#00ffc8"
+  },
+  "styling": {
+    "codeBlock": {
+      "theme": {
+        "light": "github-light",
+        "dark": "github-dark"
+      }
+    }
   },
   "favicon": "/favicon.svg",
   "navigation": {

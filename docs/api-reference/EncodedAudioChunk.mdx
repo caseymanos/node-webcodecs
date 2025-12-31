@@ -1,116 +1,264 @@
 ---
 title: "EncodedAudioChunk"
 description: "Represents a chunk of encoded audio data"
+icon: "music"
 ---
 
 # EncodedAudioChunk
 
-## Classes
+The `EncodedAudioChunk` class represents a single chunk of encoded audio data. Unlike video, most audio codecs produce chunks that are all keyframes (independently decodable), though some codecs may use delta encoding.
 
-### EncodedAudioChunk
+<Info>
+This class follows the [W3C WebCodecs EncodedAudioChunk specification](https://www.w3.org/TR/webcodecs/#encodedaudiochunk-interface).
+</Info>
 
-Defined in: [EncodedAudioChunk.ts:17](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedAudioChunk.ts#L17)
+## Quick Example
 
-#### Constructors
+```typescript
+import { EncodedAudioChunk } from 'node-webcodecs';
 
-##### Constructor
+// Create from encoded AAC data
+const chunk = new EncodedAudioChunk({
+  type: 'key',           // Audio chunks are typically all 'key'
+  timestamp: 0,          // Presentation time in microseconds
+  duration: 21333,       // Duration in microseconds (~21ms for AAC frame)
+  data: encodedAACData   // Uint8Array or ArrayBuffer
+});
 
-> **new EncodedAudioChunk**(`init`): [`EncodedAudioChunk`](#encodedaudiochunk)
+// Access properties
+console.log(chunk.type);       // 'key'
+console.log(chunk.timestamp);  // 0
+console.log(chunk.byteLength); // Size of encoded data
 
-Defined in: [EncodedAudioChunk.ts:25](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedAudioChunk.ts#L25)
+// Copy data to another buffer
+const buffer = new Uint8Array(chunk.byteLength);
+chunk.copyTo(buffer);
+```
 
-###### Parameters
+---
 
-###### init
+## Constructor
 
-[`EncodedAudioChunkInit`](#encodedaudiochunkinit)
+Creates a new `EncodedAudioChunk` from initialization data.
 
-###### Returns
+```typescript
+new EncodedAudioChunk(init: EncodedAudioChunkInit)
+```
 
-[`EncodedAudioChunk`](#encodedaudiochunk)
+<ParamField body="init" type="EncodedAudioChunkInit" required>
+  Configuration object for the encoded chunk.
 
-#### Properties
+  <Expandable title="EncodedAudioChunkInit properties">
+    <ParamField body="type" type="'key' | 'delta'" required>
+      The frame type. For most audio codecs (AAC, MP3, Opus, FLAC), use `'key'` as
+      audio frames are typically independently decodable.
+    </ParamField>
 
-##### type
+    <ParamField body="timestamp" type="number" required>
+      Presentation timestamp in **microseconds**. This determines when the audio should be played.
+    </ParamField>
 
-> `readonly` **type**: [`EncodedAudioChunkType`](#encodedaudiochunktype)
+    <ParamField body="duration" type="number">
+      Duration of the audio chunk in **microseconds**. Common values:
+      - AAC: ~21,333μs (1024 samples at 48kHz)
+      - MP3: ~26,122μs (1152 samples at 44.1kHz)
+      - Opus: 2,500-60,000μs (configurable)
+    </ParamField>
 
-Defined in: [EncodedAudioChunk.ts:20](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedAudioChunk.ts#L20)
+    <ParamField body="data" type="BufferSource" required>
+      The encoded audio data as an `ArrayBuffer` or `TypedArray`.
+      The data is copied internally, so you can reuse the source buffer.
+    </ParamField>
+  </Expandable>
+</ParamField>
 
-##### timestamp
+<Warning>
+The `type` must be exactly `'key'` or `'delta'`. Any other value will throw a `TypeError`.
+</Warning>
 
-> `readonly` **timestamp**: `number`
+---
 
-Defined in: [EncodedAudioChunk.ts:21](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedAudioChunk.ts#L21)
+## Properties
 
-##### duration
+All properties are **readonly** after construction.
 
-> `readonly` **duration**: `number` \| `null`
+<ResponseField name="type" type="'key' | 'delta'" required>
+  The chunk type. For audio, this is almost always `'key'` since most audio codecs
+  don't use inter-frame prediction.
+</ResponseField>
 
-Defined in: [EncodedAudioChunk.ts:22](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedAudioChunk.ts#L22)
+<ResponseField name="timestamp" type="number" required>
+  Presentation timestamp in microseconds. Determines when this audio should be played
+  relative to the start of the stream.
+</ResponseField>
 
-##### byteLength
+<ResponseField name="duration" type="number | null" required>
+  Duration of this audio chunk in microseconds, or `null` if not specified during construction.
+</ResponseField>
 
-> `readonly` **byteLength**: `number`
+<ResponseField name="byteLength" type="number" required>
+  Size of the encoded data in bytes. Use this to allocate a buffer for `copyTo()`.
+</ResponseField>
 
-Defined in: [EncodedAudioChunk.ts:23](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedAudioChunk.ts#L23)
+---
 
-#### Methods
+## Methods
 
-##### copyTo()
+### copyTo()
 
-> **copyTo**(`destination`): `void`
+Copies the encoded audio data to a destination buffer.
 
-Defined in: [EncodedAudioChunk.ts:62](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedAudioChunk.ts#L62)
+```typescript
+chunk.copyTo(destination: BufferSource): void
+```
 
-Copy the encoded data to a destination buffer
+<ParamField body="destination" type="BufferSource" required>
+  An `ArrayBuffer` or `TypedArray` to copy the data into. Must have at least `byteLength` bytes available.
+</ParamField>
 
-###### Parameters
+**Throws:** `TypeError` if the destination buffer is smaller than `byteLength`.
 
-###### destination
+<Accordion title="Example: Copying chunk data">
+```typescript
+const chunk = new EncodedAudioChunk({
+  type: 'key',
+  timestamp: 0,
+  data: someEncodedData
+});
 
-[`BufferSource`](types.mdx#buffersource)
+// Allocate buffer with exact size needed
+const buffer = new Uint8Array(chunk.byteLength);
+chunk.copyTo(buffer);
 
-###### Returns
+// Now buffer contains a copy of the encoded data
+console.log(`Copied ${buffer.length} bytes of audio`);
+```
+</Accordion>
 
-`void`
+---
 
-## Interfaces
-
-### EncodedAudioChunkInit
-
-Defined in: [EncodedAudioChunk.ts:10](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedAudioChunk.ts#L10)
-
-#### Properties
-
-##### type
-
-> **type**: [`EncodedAudioChunkType`](#encodedaudiochunktype)
-
-Defined in: [EncodedAudioChunk.ts:11](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedAudioChunk.ts#L11)
-
-##### timestamp
-
-> **timestamp**: `number`
-
-Defined in: [EncodedAudioChunk.ts:12](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedAudioChunk.ts#L12)
-
-##### duration?
-
-> `optional` **duration**: `number`
-
-Defined in: [EncodedAudioChunk.ts:13](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedAudioChunk.ts#L13)
-
-##### data
-
-> **data**: [`BufferSource`](types.mdx#buffersource)
-
-Defined in: [EncodedAudioChunk.ts:14](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedAudioChunk.ts#L14)
-
-## Type Aliases
+## Type Definitions
 
 ### EncodedAudioChunkType
 
-> **EncodedAudioChunkType** = `"key"` \| `"delta"`
+```typescript
+type EncodedAudioChunkType = 'key' | 'delta';
+```
 
-Defined in: [EncodedAudioChunk.ts:8](https://github.com/caseymanos/node-webcodecs/blob/master/src/EncodedAudioChunk.ts#L8)
+| Value | Description |
+|-------|-------------|
+| `'key'` | Keyframe - can be decoded independently (most common for audio) |
+| `'delta'` | Delta frame - requires previous frames (rare for audio) |
+
+### EncodedAudioChunkInit
+
+```typescript
+interface EncodedAudioChunkInit {
+  type: EncodedAudioChunkType;  // Required: 'key' or 'delta'
+  timestamp: number;            // Required: microseconds
+  duration?: number;            // Optional: microseconds
+  data: BufferSource;           // Required: encoded data
+}
+```
+
+---
+
+## Usage with AudioEncoder
+
+`EncodedAudioChunk` objects are typically created by `AudioEncoder` and passed to your output callback:
+
+```typescript
+import { AudioEncoder, AudioData } from 'node-webcodecs';
+
+const encoder = new AudioEncoder({
+  output: (chunk, metadata) => {
+    // chunk is an EncodedAudioChunk
+    console.log(`Got audio chunk at ${chunk.timestamp}μs`);
+    console.log(`Size: ${chunk.byteLength} bytes`);
+    console.log(`Duration: ${chunk.duration}μs`);
+
+    // Copy to your own buffer for storage/transmission
+    const data = new Uint8Array(chunk.byteLength);
+    chunk.copyTo(data);
+
+    // First chunk includes decoder config in metadata
+    if (metadata?.decoderConfig) {
+      console.log('Decoder config:', metadata.decoderConfig);
+    }
+  },
+  error: (e) => console.error('Encoding error:', e)
+});
+
+encoder.configure({
+  codec: 'mp4a.40.2',     // AAC-LC
+  sampleRate: 48000,
+  numberOfChannels: 2,
+  bitrate: 128_000
+});
+```
+
+## Usage with AudioDecoder
+
+Pass `EncodedAudioChunk` objects to `AudioDecoder.decode()`:
+
+```typescript
+import { AudioDecoder, EncodedAudioChunk } from 'node-webcodecs';
+
+const decoder = new AudioDecoder({
+  output: (audioData) => {
+    console.log(`Decoded: ${audioData.numberOfFrames} samples`);
+    console.log(`Format: ${audioData.format}`);
+    audioData.close();  // Don't forget to close!
+  },
+  error: (e) => console.error('Decoding error:', e)
+});
+
+decoder.configure({
+  codec: 'mp4a.40.2',
+  sampleRate: 48000,
+  numberOfChannels: 2
+});
+
+// Decode a chunk
+const chunk = new EncodedAudioChunk({
+  type: 'key',
+  timestamp: 0,
+  data: aacFrameData
+});
+
+decoder.decode(chunk);
+await decoder.flush();
+```
+
+---
+
+## Audio Codec Frame Sizes
+
+Different audio codecs produce chunks of different durations:
+
+| Codec | Samples per Frame | Duration at 48kHz | Duration at 44.1kHz |
+|-------|-------------------|-------------------|---------------------|
+| AAC | 1024 | ~21,333μs | ~23,220μs |
+| MP3 | 1152 | 24,000μs | ~26,122μs |
+| Opus | 120-2880 | 2,500-60,000μs | N/A (always 48kHz) |
+| FLAC | Variable | Variable | Variable |
+| Vorbis | Variable | Variable | Variable |
+
+---
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="EncodedVideoChunk" icon="film" href="/api-reference/EncodedVideoChunk">
+    The video equivalent for encoded video data
+  </Card>
+  <Card title="AudioEncoder" icon="microphone" href="/api-reference/AudioEncoder">
+    Encodes AudioData into EncodedAudioChunks
+  </Card>
+  <Card title="AudioDecoder" icon="volume-high" href="/api-reference/AudioDecoder">
+    Decodes EncodedAudioChunks into AudioData
+  </Card>
+  <Card title="AudioData" icon="waveform" href="/api-reference/AudioData">
+    Raw audio sample data
+  </Card>
+</CardGroup>
