@@ -566,7 +566,7 @@ const decoder = new VideoDecoder({
 
     // Copy pixel data for processing
     const buffer = new Uint8Array(frame.allocationSize());
-    frame.copyTo(buffer);
+    await frame.copyTo(buffer);
 
     // Always close the frame when done!
     frame.close();

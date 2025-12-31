@@ -422,7 +422,7 @@ decoder.output = (frame) => {
   // Copy pixel data to buffer
   const size = frame.allocationSize({ format: frame.format });
   const buffer = new Uint8Array(size);
-  frame.copyTo(buffer);
+  await frame.copyTo(buffer);
 
   console.log(`Copied ${size} bytes of pixel data`);
 

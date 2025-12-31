@@ -167,7 +167,7 @@ async function downscale4KTo1080p(input4K, output1080p) {
       // Get 4K pixel data
       const size4K = frame.allocationSize({ format: 'RGBA' });
       const pixels4K = new Uint8Array(size4K);
-      frame.copyTo(pixels4K);
+      await frame.copyTo(pixels4K);
 
       // Resize to 1080p (simplified - use proper image library)
       const pixels1080p = resizeImage(pixels4K, 3840, 2160, 1920, 1080);
@@ -398,7 +398,7 @@ async function createABRLadder(inputChunks, decoderConfig) {
       // Get pixel data
       const size = frame.allocationSize({ format: 'RGBA' });
       const pixels = new Uint8Array(size);
-      frame.copyTo(pixels);
+      await frame.copyTo(pixels);
 
       // Encode to each quality
       for (const { encoder, quality } of encoders) {

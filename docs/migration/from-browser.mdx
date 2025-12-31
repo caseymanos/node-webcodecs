@@ -303,7 +303,7 @@ export class FadeInEffect implements Effect {
       frame.codedWidth * frame.codedHeight * 4
     );
 
-    frame.copyTo(buffer);
+    await frame.copyTo(buffer);
 
     // Apply opacity
     for (let i = 3; i < buffer.length; i += 4) {
@@ -528,7 +528,7 @@ export class WatermarkEffect implements VideoEffect {
 
     // Extract frame data
     const buffer = new Uint8ClampedArray(codedWidth * codedHeight * 4);
-    frame.copyTo(buffer);
+    await frame.copyTo(buffer);
 
     // Simple text watermark (pixel manipulation)
     // In production, use node-canvas or OffscreenCanvas

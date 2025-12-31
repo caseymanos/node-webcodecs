@@ -204,7 +204,7 @@ This cookbook provides practical, production-ready recipes for common video enco
     // Process (example: get pixel data)
     const size = frame.allocationSize({ format: 'RGBA' });
     const pixelData = new Uint8Array(size);
-    frame.copyTo(pixelData);
+    await frame.copyTo(pixelData);
 
     // Always close!
     frame.close();
@@ -224,7 +224,7 @@ This cookbook provides practical, production-ready recipes for common video enco
       // Get pixel data
       const size = frame.allocationSize({ format: 'RGBA' });
       const pixels = new Uint8Array(size);
-      frame.copyTo(pixels);
+      await frame.copyTo(pixels);
 
       // Resize to 1080p (use image library like sharp)
       const resized = resizeImage(pixels, 3840, 2160, 1920, 1080);

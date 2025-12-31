@@ -15,7 +15,7 @@ Generate thumbnails by extracting and saving video frames as images. Common use 
 ## Quick Start
 
 ```javascript
-const { VideoDecoder, VideoFrame } = require('node-webcodecs');
+const { VideoDecoder, VideoFrame, EncodedVideoChunk } = require('node-webcodecs');
 const fs = require('fs');
 const sharp = require('sharp');  // For image processing
 
@@ -28,7 +28,7 @@ async function extractFirstFrame(videoFile) {
         // Get pixel data
         const size = frame.allocationSize({ format: 'RGBA' });
         const pixels = new Uint8Array(size);
-        frame.copyTo(pixels);
+        await frame.copyTo(pixels);
 
         // Save as PNG
         await sharp(Buffer.from(pixels), {
@@ -113,7 +113,7 @@ async function extractThumbnails(inputChunks, decoderConfig, count = 5) {
     if (frame) {
       const size = frame.allocationSize({ format: 'RGBA' });
       const pixels = new Uint8Array(size);
-      frame.copyTo(pixels);
+      await frame.copyTo(pixels);
 
       const filename = `thumbnail_${i}.png`;
       await sharp(Buffer.from(pixels), {
@@ -187,7 +187,7 @@ async function createThumbnailGrid(inputChunks, decoderConfig, cols = 4, rows = 
   for (const frame of selectedFrames) {
     const size = frame.allocationSize({ format: 'RGBA' });
     const pixels = new Uint8Array(size);
-    frame.copyTo(pixels);
+    await frame.copyTo(pixels);
 
     const resized = await sharp(Buffer.from(pixels), {
       raw: {
@@ -297,7 +297,7 @@ async function extractAtTimestamps(inputChunks, decoderConfig, timestamps) {
   for (const { frame, timestamp, index } of extractedFrames) {
     const size = frame.allocationSize({ format: 'RGBA' });
     const pixels = new Uint8Array(size);
-    frame.copyTo(pixels);
+    await frame.copyTo(pixels);
 
     await sharp(Buffer.from(pixels), {
       raw: {
@@ -352,7 +352,7 @@ async function extractJpegThumbnails(inputChunks, decoderConfig, count = 5) {
     if (frame) {
       const size = frame.allocationSize({ format: 'RGBA' });
       const pixels = new Uint8Array(size);
-      frame.copyTo(pixels);
+      await frame.copyTo(pixels);
 
       await sharp(Buffer.from(pixels), {
         raw: {
@@ -387,7 +387,7 @@ async function extractSceneChanges(inputChunks, decoderConfig, threshold = 30) {
     output: async (frame) => {
       const size = frame.allocationSize({ format: 'RGBA' });
       const pixels = new Uint8Array(size);
-      frame.copyTo(pixels);
+      await frame.copyTo(pixels);
 
       // Compare with previous frame
       if (prevPixels) {
@@ -494,7 +494,7 @@ async function extractWebPThumbnails(inputChunks, decoderConfig, count = 5) {
     if (frame) {
       const size = frame.allocationSize({ format: 'RGBA' });
       const pixels = new Uint8Array(size);
-      frame.copyTo(pixels);
+      await frame.copyTo(pixels);
 
       await sharp(Buffer.from(pixels), {
         raw: {

@@ -91,7 +91,7 @@ const decoder = new VideoDecoder({
   output: (frame) => {
     // Process the decoded frame
     const data = new Uint8Array(frame.allocationSize());
-    frame.copyTo(data);
+    await frame.copyTo(data);
 
     // MUST close to prevent memory leaks
     frame.close();

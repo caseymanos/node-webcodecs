@@ -54,11 +54,11 @@ async function addLogoWatermark(inputChunks, decoderConfig, logoPath) {
 
   // Create decoder
   const decoder = new VideoDecoder({
-    output: (frame) => {
+    output: async (frame) => {
       // Get frame pixels
       const size = frame.allocationSize({ format: 'RGBA' });
       const pixels = new Uint8Array(size);
-      frame.copyTo(pixels);
+      await frame.copyTo(pixels);
 
       // Create canvas
       const canvas = createCanvas(frame.codedWidth, frame.codedHeight);
@@ -137,10 +137,10 @@ async function addTextWatermark(inputChunks, decoderConfig, text) {
   });
 
   const decoder = new VideoDecoder({
-    output: (frame) => {
+    output: async (frame) => {
       const size = frame.allocationSize({ format: 'RGBA' });
       const pixels = new Uint8Array(size);
-      frame.copyTo(pixels);
+      await frame.copyTo(pixels);
 
       const canvas = createCanvas(frame.codedWidth, frame.codedHeight);
       const ctx = canvas.getContext('2d');
@@ -225,10 +225,10 @@ async function addAnimatedWatermark(inputChunks, decoderConfig) {
   });
 
   const decoder = new VideoDecoder({
-    output: (frame) => {
+    output: async (frame) => {
       const size = frame.allocationSize({ format: 'RGBA' });
       const pixels = new Uint8Array(size);
-      frame.copyTo(pixels);
+      await frame.copyTo(pixels);
 
       const canvas = createCanvas(frame.codedWidth, frame.codedHeight);
       const ctx = canvas.getContext('2d');
