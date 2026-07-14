@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.2.2] - 2026-07-14
+
+### Added
+- Linux arm64 prebuilt binaries (Graviton, Docker on Apple Silicon)
+
 ## [1.2.1] - 2026-07-14
 
 ### Fixed

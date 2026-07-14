@@ -21,7 +21,8 @@ jobs:
           # Linux
           - os: ubuntu-24.04
             arch: x64
-          # Note: Linux arm64 would need self-hosted runner or QEMU
+          - os: ubuntu-24.04-arm
+            arch: arm64
 
     steps:
       - uses: actions/checkout@v4

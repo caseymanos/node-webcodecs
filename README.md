@@ -28,7 +28,7 @@ Native WebCodecs API implementation for Node.js, using FFmpeg for encoding and d
 - Node.js 18+
 - FFmpeg libraries (libavcodec, libavutil, libswscale, libswresample)
 
-Prebuilt binaries ship for **macOS arm64** and **Linux x64**, so on those platforms nothing compiles at install time — you only need the FFmpeg runtime libraries. On other platforms the addon builds from source, which additionally requires `pkg-config` and a C++ compiler (Xcode Command Line Tools on macOS, build-essential on Linux).
+Prebuilt binaries ship for **macOS arm64**, **Linux x64**, and **Linux arm64**, so on those platforms nothing compiles at install time — you only need the FFmpeg runtime libraries. On other platforms the addon builds from source, which additionally requires `pkg-config` and a C++ compiler (Xcode Command Line Tools on macOS, build-essential on Linux).
 
 ### Installing Dependencies
 
