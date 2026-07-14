@@ -136,7 +136,8 @@
       "import": "./mediabunny.mjs",
       "require": "./dist/mediabunny.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./dist/*": "./dist/*"
   },
   "peerDependencies": {
     "mediabunny": ">=1.0.0"

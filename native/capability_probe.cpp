@@ -97,6 +97,40 @@ Napi::Value CapabilityProbe::ProbeVideoEncoder(const Napi::CallbackInfo& info) {
             result.Set("codedHeight", Napi::Number::New(env, ctx->coded_height));
         }
         // avcodec_free_context below handles cleanup
+    } else if (encInfo.hwType != HWAccel::Type::None && hwPref != HWAccel::Preference::PreferHardware) {
+        // Hardware candidate failed to open (e.g. no GPU in a container);
+        // the config may still be encodable in software
+        avcodec_free_context(&ctx);
+        if (hwDeviceCtx) {
+            av_buffer_unref(&hwDeviceCtx);
+            hwDeviceCtx = nullptr;
+        }
+        result.Set("hardwareAccelerated", Napi::Boolean::New(env, false));
+
+        HWAccel::EncoderInfo swInfo = HWAccel::selectEncoder(codecName, HWAccel::Preference::PreferSoftware, width, height);
+        if (swInfo.codec) {
+            ctx = avcodec_alloc_context3(swInfo.codec);
+            ctx->width = width;
+            ctx->height = height;
+            ctx->time_base = {1, 1000000};
+            ctx->pix_fmt = swInfo.inputFormat;
+            ctx->bit_rate = 2000000;
+            ctx->gop_size = 30;
+            ctx->framerate = {30, 1};
+            ctx->max_b_frames = 0;
+
+            ret = avcodec_open2(ctx, swInfo.codec, nullptr);
+            if (ret >= 0) {
+                result.Set("supported", Napi::Boolean::New(env, true));
+                result.Set("encoderName", Napi::String::New(env, swInfo.codec->name));
+            } else {
+                char errBuf[256];
+                av_strerror(ret, errBuf, sizeof(errBuf));
+                result.Set("error", Napi::String::New(env, errBuf));
+            }
+            avcodec_free_context(&ctx);
+        }
+        return result;
     } else {
         char errBuf[256];
         av_strerror(ret, errBuf, sizeof(errBuf));

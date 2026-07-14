@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1] - 2026-07-14
+
+### Fixed
+- Source builds work again on platforms without prebuilds (install fallback ran cmake-js, a devDependency; now via npx) and on FFmpeg 5.x (AVFrame.duration version guard) — notably the default `node:22` Docker image
+- Encoder capability probe now falls back to software when the hardware candidate fails to open (e.g. no GPU in a container); previously `isConfigSupported` wrongly reported H.264 unsupported on GPU-less Linux, causing Mediabunny to fall back to AV1
+- Deep imports (`node-webcodecs/dist/*`) work again alongside the new exports map
+
 ## [1.2.0] - 2026-07-14
 
 ### Added
