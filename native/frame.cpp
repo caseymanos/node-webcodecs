@@ -486,7 +486,7 @@ Napi::Value VideoFrameNative::Scale(const Napi::CallbackInfo& info) {
     out->width = dstW;
     out->height = dstH;
     out->pts = frame_->pts;
-    out->duration = frame_->duration;
+    NWC_FRAME_DURATION(out) = NWC_FRAME_DURATION(frame_);
 
     if (av_frame_get_buffer(out, 0) < 0) {
         av_frame_free(&out);

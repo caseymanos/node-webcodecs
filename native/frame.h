@@ -11,6 +11,13 @@ extern "C" {
 #include <libavutil/opt.h>
 }
 
+// AVFrame.duration arrived in FFmpeg 6 (lavu 58); older releases use pkt_duration
+#if LIBAVUTIL_VERSION_INT < AV_VERSION_INT(58, 2, 100)
+#define NWC_FRAME_DURATION(f) ((f)->pkt_duration)
+#else
+#define NWC_FRAME_DURATION(f) ((f)->duration)
+#endif
+
 class VideoFrameNative : public Napi::ObjectWrap<VideoFrameNative> {
 public:
     static Napi::Object Init(Napi::Env env, Napi::Object exports);

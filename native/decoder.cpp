@@ -214,7 +214,7 @@ Napi::Value VideoDecoderNative::Flush(const Napi::CallbackInfo& info) {
         int ret;
         while ((ret = avcodec_receive_frame(codecCtx_, frame)) >= 0) {
             AVFrame* outputFrame = av_frame_clone(frame);
-            EmitFrame(env, outputFrame, frame->pts, frame->duration);
+            EmitFrame(env, outputFrame, frame->pts, NWC_FRAME_DURATION(frame));
             av_frame_unref(frame);
         }
         av_frame_free(&frame);

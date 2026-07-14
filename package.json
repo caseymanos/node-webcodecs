@@ -16,7 +16,7 @@
     "test:integration": "node test/integration/encode-decode.test.js && node test/integration/audio-encode-decode.test.js && node test/integration/vp8-vp9-encode-decode.test.js && node test/integration/hevc-av1-encode-decode.test.js",
     "prebuild": "prebuildify --napi --strip",
     "prebuild:ci": "prebuildify-ci",
-    "install": "node-gyp-build || cmake-js compile",
+    "install": "node-gyp-build || npx --yes cmake-js compile",
     "prepublishOnly": "npm run build:ts && npm test && npm run test:spec",
     "lint": "eslint src/**/*.ts",
     "docs:generate": "typedoc",

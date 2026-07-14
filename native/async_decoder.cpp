@@ -343,7 +343,7 @@ void VideoDecoderAsync::ProcessFlush() {
         DecodeResult* result = new DecodeResult();
         result->frame = outputFrame;
         result->timestamp = frame->pts;
-        result->duration = frame->duration;
+        result->duration = NWC_FRAME_DURATION(frame);
         result->isError = false;
         result->isFlushComplete = false;
 
