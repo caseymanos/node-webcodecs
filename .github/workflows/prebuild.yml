@@ -80,7 +80,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          registry-url: 'https://registry.npmjs.org'
+          # no registry-url: it writes an _authToken .npmrc line, which
+          # makes npm use token auth instead of OIDC trusted publishing
 
       - name: Download all prebuilds
         uses: actions/download-artifact@v4
