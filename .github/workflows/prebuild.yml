@@ -113,7 +113,9 @@ jobs:
       - name: Build TypeScript
         run: npm run build:ts
 
+      # npm trusted publishing (OIDC) requires npm >= 11.5.1; Node 20 bundles npm 10
+      - name: Update npm for trusted publishing
+        run: npm install -g npm@latest
+
       - name: Publish to npm with provenance
         run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
