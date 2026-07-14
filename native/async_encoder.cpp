@@ -774,6 +774,10 @@ void VideoEncoderAsync::ProcessFlush() {
     }
     av_packet_free(&packet);
 
+    // Draining puts the codec in EOF state; per WebCodecs spec the encoder
+    // must accept new frames after flush(), so reset it
+    avcodec_flush_buffers(codecCtx_);
+
     // Signal flush complete using NonBlockingCall to prevent deadlock
     if (tsfnFlush_) {
         tsfnFlush_.NonBlockingCall([](Napi::Env env, Napi::Function fn) {

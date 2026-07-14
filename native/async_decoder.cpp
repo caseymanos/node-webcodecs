@@ -145,6 +145,14 @@ void VideoDecoderAsync::Configure(const Napi::CallbackInfo& info) {
     // 0 = auto-detect core count; default of 1 leaves multicore decode on the table
     codecCtx_->thread_count = 0;
 
+    // Frame threading buffers ~thread_count frames before output; for
+    // latency-sensitive use (seeking, realtime) restrict to slice threading
+    if (config.Has("optimizeForLatency") &&
+        config.Get("optimizeForLatency").ToBoolean().Value()) {
+        codecCtx_->thread_type = FF_THREAD_SLICE;
+        codecCtx_->flags |= AV_CODEC_FLAG_LOW_DELAY;
+    }
+
     // Open codec
     int ret = avcodec_open2(codecCtx_, codec_, nullptr);
     if (ret < 0) {
@@ -318,6 +326,10 @@ void VideoDecoderAsync::ProcessFlush() {
         av_frame_unref(frame);
     }
     av_frame_free(&frame);
+
+    // Draining puts the codec in EOF state; per WebCodecs spec the decoder
+    // must accept new chunks after flush(), so reset it
+    avcodec_flush_buffers(codecCtx_);
 
     // Signal flush complete using NonBlockingCall to prevent deadlock
     if (tsfnFlush_) {

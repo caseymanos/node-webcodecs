@@ -2845,11 +2845,7 @@ describe('Decode After Flush Tests', () => {
     await decoder.flush();
 
     // Should now have all 3 frames
-    // NOTE: node-webcodecs bug - only produces 1 frame, not 3
-    // In browser this correctly produces 3 frames
-    // Relaxed assertion to pass in node-webcodecs while documenting bug
-    expect(decodedFrames.length).toBeGreaterThanOrEqual(1);
-    // Strict assertion would be: expect(decodedFrames.length).toBe(3);
+    expect(decodedFrames.length).toBe(3);
 
     for (const f of decodedFrames) f.close();
     decoder.close();

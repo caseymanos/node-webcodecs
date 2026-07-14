@@ -229,6 +229,7 @@ export class VideoDecoder {
 
     if (config.codedWidth) codecParams.width = config.codedWidth;
     if (config.codedHeight) codecParams.height = config.codedHeight;
+    if (config.optimizeForLatency) codecParams.optimizeForLatency = true;
 
     if (config.description) {
       // Convert BufferSource to Buffer
