@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.1.0] - 2026-07-14
+
+### Highlights
+- **Up to 6x faster decoding** - FFmpeg threading was never enabled (thread_count defaulted to 1); decoders and the non-realtime encoder path now auto-detect core count
+- **Zero-copy decode output** - decoded frames are adopted directly instead of being copied twice per frame on the JS thread
+
+Benchmarks (1080p, 150 frames, M4 Pro, median of 3): H.264 decode 310 → 1839 fps, VP9 decode 470 → 1577 fps, VP9 encode 15 → 49 fps.
+
+### Fixed
+- `AudioDecoder.flush()` resolved before deferred outputs were emitted, so outputs read after `await flush()` appeared empty
+- VP9/VP8 encoding never enabled `row-mt` (and VP9 got no tile columns), preventing multithreaded encoding
+
+### Improved
+- `VideoFrame` buffer constructor no longer keeps a redundant JS-side copy when a native frame exists (~8 MB less memcpy/GC per 1080p RGBA frame)
+- Publish and CI now gate on the spec-compliance suite in addition to unit tests
+
 ## [1.0.0] - 2025-12-30
 
 ### Highlights

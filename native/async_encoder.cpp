@@ -108,6 +108,9 @@ void VideoEncoderAsync::configureEncoderOptions(const std::string& encoderName, 
         codecCtx_->delay = 0;
         codecCtx_->max_b_frames = 0;
         codecCtx_->refs = 1;
+    } else {
+        // 0 = auto-detect core count; default of 1 leaves multicore encode on the table
+        codecCtx_->thread_count = 0;
     }
 
     if (encoderName == "libx264") {
@@ -160,6 +163,11 @@ void VideoEncoderAsync::configureEncoderOptions(const std::string& encoderName, 
         if (codecCtx_->bit_rate > 0) {
             av_opt_set_int(codecCtx_->priv_data, "crf", 10, 0);
             av_opt_set_int(codecCtx_->priv_data, "b", codecCtx_->bit_rate, 0);
+        }
+        // libvpx only parallelizes with row-mt and, for VP9, tiles
+        av_opt_set_int(codecCtx_->priv_data, "row-mt", 1, 0);
+        if (encoderName == "libvpx-vp9" && width_ >= 1280) {
+            av_opt_set_int(codecCtx_->priv_data, "tile-columns", 2, 0);
         }
         if (isRealtime) {
             av_opt_set_int(codecCtx_->priv_data, "cpu-used", 8, 0);

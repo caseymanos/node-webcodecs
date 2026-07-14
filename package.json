@@ -17,7 +17,7 @@
     "prebuild": "prebuildify --napi --strip",
     "prebuild:ci": "prebuildify-ci",
     "install": "node-gyp-build || cmake-js compile",
-    "prepublishOnly": "npm run build:ts && npm test",
+    "prepublishOnly": "npm run build:ts && npm test && npm run test:spec",
     "lint": "eslint src/**/*.ts",
     "docs:generate": "typedoc",
     "docs:dev": "cd docs && mintlify dev",

@@ -42,5 +42,10 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Run spec-compliance tests
+        # vitest 3 / vite are ESM-only and cannot load on Node 18
+        if: matrix.node != 18
+        run: npm run test:spec
+
       - name: Run integration tests
         run: npm run test:integration
