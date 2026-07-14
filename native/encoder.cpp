@@ -575,11 +575,21 @@ void VideoEncoderNative::Encode(const Napi::CallbackInfo& info) {
         srcFrame->height != height_) {
 
         if (!swsCtx_) {
-            swsCtx_ = sws_getContext(
-                srcFrame->width, srcFrame->height, (AVPixelFormat)srcFrame->format,
-                width_, height_, targetFormat,
-                SWS_BILINEAR, nullptr, nullptr, nullptr
-            );
+            // sws_getContext is single-threaded; build via sws_alloc_context so
+            // conversion can use all cores (threads=0 -> auto, FFmpeg 5.1+)
+            swsCtx_ = sws_alloc_context();
+            av_opt_set_int(swsCtx_, "srcw", srcFrame->width, 0);
+            av_opt_set_int(swsCtx_, "srch", srcFrame->height, 0);
+            av_opt_set_int(swsCtx_, "src_format", srcFrame->format, 0);
+            av_opt_set_int(swsCtx_, "dstw", width_, 0);
+            av_opt_set_int(swsCtx_, "dsth", height_, 0);
+            av_opt_set_int(swsCtx_, "dst_format", targetFormat, 0);
+            av_opt_set_int(swsCtx_, "sws_flags", SWS_BILINEAR, 0);
+            av_opt_set_int(swsCtx_, "threads", 0, 0);
+            if (sws_init_context(swsCtx_, nullptr, nullptr) < 0) {
+                sws_freeContext(swsCtx_);
+                swsCtx_ = nullptr;
+            }
 
             if (!swsCtx_) {
                 av_frame_free(&frame);
@@ -588,10 +598,7 @@ void VideoEncoderNative::Encode(const Napi::CallbackInfo& info) {
             }
         }
 
-        sws_scale(swsCtx_,
-            srcFrame->data, srcFrame->linesize, 0, srcFrame->height,
-            frame->data, frame->linesize
-        );
+        sws_scale_frame(swsCtx_, frame, srcFrame);
     } else {
         // OPTIMIZATION: Use av_frame_ref for zero-copy when formats match exactly
         // This just increments the reference count instead of copying data
