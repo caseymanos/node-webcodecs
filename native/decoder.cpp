@@ -116,6 +116,9 @@ void VideoDecoderNative::Configure(const Napi::CallbackInfo& info) {
         memset(codecCtx_->extradata + extradata.Length(), 0, AV_INPUT_BUFFER_PADDING_SIZE);
     }
 
+    // 0 = auto-detect core count; default of 1 leaves multicore decode on the table
+    codecCtx_->thread_count = 0;
+
     // Open codec
     int ret = avcodec_open2(codecCtx_, codec_, nullptr);
     if (ret < 0) {

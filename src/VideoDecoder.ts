@@ -3,7 +3,7 @@
  * Implements the W3C WebCodecs VideoDecoder interface
  */
 
-import { VideoFrame, VideoFrameBufferInit } from './VideoFrame';
+import { VideoFrame } from './VideoFrame';
 import { EncodedVideoChunk } from './EncodedVideoChunk';
 import { isVideoCodecSupported, getFFmpegVideoDecoder, parseAvcCodecString } from './codec-registry';
 import { CodecState, DOMException, BufferSource } from './types';
@@ -321,25 +321,11 @@ export class VideoDecoder {
   }
 
   private _onFrame(nativeFrame: any, timestamp: number, duration: number): void {
-    // Get frame info from native immediately since nativeFrame may be recycled
-    const width = nativeFrame.width;
-    const height = nativeFrame.height;
-    const format = nativeFrame.format || 'I420';
-    const size = nativeFrame.allocationSize();
-    const buffer = Buffer.alloc(size);
-    nativeFrame.copyTo(buffer);
-
     // Output frames are delivered asynchronously
     // Queue size management and dequeue events are handled in decode()
     try {
-      // Create VideoFrame
-      const frame = new VideoFrame(buffer, {
-        format: format,
-        codedWidth: width,
-        codedHeight: height,
-        timestamp: timestamp,
-        duration: duration > 0 ? duration : undefined,
-      } as VideoFrameBufferInit);
+      // Each callback gets a freshly wrapped AVFrame, so adopt it zero-copy
+      const frame = VideoFrame._adopt(nativeFrame, timestamp, duration > 0 ? duration : undefined);
 
       this._outputCallback(frame);
     } catch (e) {

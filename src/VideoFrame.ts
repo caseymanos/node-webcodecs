@@ -147,9 +147,6 @@ export class VideoFrame {
         );
       }
 
-      // Store buffer copy for non-native mode
-      this._buffer = new Uint8Array(buffer);
-
       // Try to create native frame if available
       if (native) {
         try {
@@ -164,6 +161,9 @@ export class VideoFrame {
           this._native = null;
         }
       }
+
+      // Buffer copy only needed as a fallback when there's no native frame
+      this._buffer = this._native ? null : new Uint8Array(buffer);
 
       this._format = bufferInit.format;
       this._codedWidth = bufferInit.codedWidth;
@@ -195,6 +195,32 @@ export class VideoFrame {
           )
         : new DOMRectReadOnly(0, 0, bufferInit.codedWidth, bufferInit.codedHeight);
     }
+  }
+
+  /**
+   * Wrap a decoder-owned native frame without copying (internal use only).
+   * The native frame owns its AVFrame; the returned VideoFrame takes ownership.
+   */
+  static _adopt(nativeFrame: any, timestamp: number, duration?: number): VideoFrame {
+    const frame: VideoFrame = Object.create(VideoFrame.prototype);
+    frame._native = nativeFrame;
+    frame._buffer = null;
+    frame._closed = false;
+    frame._format = nativeFrame.format || 'I420';
+    frame._codedWidth = nativeFrame.width;
+    frame._codedHeight = nativeFrame.height;
+    frame._displayWidth = nativeFrame.width;
+    frame._displayHeight = nativeFrame.height;
+    frame._timestamp = timestamp;
+    frame._duration = duration ?? null;
+    frame._colorSpace = new VideoColorSpace({
+      primaries: 'bt709',
+      transfer: 'bt709',
+      matrix: 'bt709',
+      fullRange: false,
+    });
+    frame._visibleRect = new DOMRectReadOnly(0, 0, nativeFrame.width, nativeFrame.height);
+    return frame;
   }
 
   /**
