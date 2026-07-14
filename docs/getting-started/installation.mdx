@@ -7,8 +7,12 @@ description: "Platform-specific installation guide for node-webcodecs"
 
 - **Node.js** 18 or higher (or Bun 1.0+)
 - **FFmpeg libraries** (libavcodec, libavutil, libswscale, libswresample)
-- **pkg-config** (for finding FFmpeg during build)
-- **C++ compiler** (Xcode Command Line Tools on macOS, build-essential on Linux)
+- **pkg-config** (only when building from source)
+- **C++ compiler** (only when building from source; Xcode Command Line Tools on macOS, build-essential on Linux)
+
+<Note>
+Prebuilt binaries ship for macOS arm64 and Linux x64 — on those platforms nothing compiles at install time, so pkg-config and a compiler are not needed. Only the FFmpeg runtime libraries are required.
+</Note>
 
 ## Platform-Specific Setup
 

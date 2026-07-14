@@ -27,14 +27,14 @@ Native WebCodecs API implementation for Node.js, using FFmpeg for encoding and d
 
 - Node.js 18+
 - FFmpeg libraries (libavcodec, libavutil, libswscale, libswresample)
-- pkg-config (for finding FFmpeg during build)
-- A C++ compiler (Xcode Command Line Tools on macOS, build-essential on Linux)
+
+Prebuilt binaries ship for **macOS arm64** and **Linux x64**, so on those platforms nothing compiles at install time — you only need the FFmpeg runtime libraries. On other platforms the addon builds from source, which additionally requires `pkg-config` and a C++ compiler (Xcode Command Line Tools on macOS, build-essential on Linux).
 
 ### Installing Dependencies
 
 **macOS (Homebrew):**
 ```bash
-brew install ffmpeg pkg-config
+brew install ffmpeg
 
 # Ensure Homebrew is in your PATH (add to ~/.zshrc or ~/.bashrc)
 export PATH="/opt/homebrew/bin:$PATH"
@@ -42,11 +42,11 @@ export PATH="/opt/homebrew/bin:$PATH"
 
 **Ubuntu/Debian:**
 ```bash
-sudo apt-get install build-essential pkg-config libavcodec-dev libavutil-dev libswscale-dev libswresample-dev
+sudo apt-get install libavcodec-dev libavutil-dev libswscale-dev libswresample-dev
 ```
 
-**Windows:**
-Install FFmpeg and add to PATH, or use vcpkg. Ensure `pkg-config` is available.
+**Windows (builds from source):**
+Install FFmpeg and add to PATH, or use vcpkg. Ensure `pkg-config` and a C++ compiler are available.
 
 ## Installation
 
@@ -281,6 +281,19 @@ encoder.configure({
 ```
 
 Benchmark results show async mode allows **3100% more event loop iterations** compared to sync mode, meaning your HTTP servers, timers, and I/O operations continue running smoothly during encoding.
+
+## Performance
+
+Decoding is multithreaded (FFmpeg auto-detects core count) and decoded frames are delivered zero-copy. Measured at 1080p over 150 frames on an Apple M4 Pro (v1.1.4, software codecs):
+
+| Operation | Throughput |
+|-----------|-----------|
+| H.264 decode | ~1,800 fps |
+| VP9 decode | ~1,570 fps |
+| VP9 encode | ~49 fps |
+| H.264 encode (VideoToolbox) | ~220 fps |
+
+Relative to v1.0.0 this is 3–6× faster decoding and ~3× faster VP9 encoding.
 
 ### Audio Codecs
 
