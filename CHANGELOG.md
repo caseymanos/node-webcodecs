@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.0] - 2026-07-14
+
+### Added
+- `node-webcodecs/register` — installs the WebCodecs classes on `globalThis`, so browser-first libraries (e.g. Mediabunny) run unmodified in Node
+- `node-webcodecs/mediabunny` — one-line Mediabunny integration: globals plus a `VideoSample` transformer so `Conversion` resizing works without a canvas
+- `VideoFrame._scale()` — native multithreaded scaling (used by the transformer)
+
+### Fixed
+- Decoder and encoder were unusable after `flush()` (FFmpeg left in EOF state); per the WebCodecs spec they now accept new work after a flush. This also fixes Mediabunny's frame-accurate seeking.
+- `optimizeForLatency` was accepted but ignored; it now restricts the decoder to slice threading with `AV_CODEC_FLAG_LOW_DELAY`
+- Processes no longer hang after codec work completes: the event loop is held only while encodes/decodes/flushes are in flight
+
 ## [1.1.5] - 2026-07-14
 
 ### Improved

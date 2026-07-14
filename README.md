@@ -282,6 +282,29 @@ encoder.configure({
 
 Benchmark results show async mode allows **3100% more event loop iterations** compared to sync mode, meaning your HTTP servers, timers, and I/O operations continue running smoothly during encoding.
 
+## Use with Mediabunny
+
+[Mediabunny](https://mediabunny.dev/) reads and writes MP4/WebM files using the environment's WebCodecs. One import gives it this package's codecs in Node:
+
+```javascript
+import 'node-webcodecs/mediabunny';  // WebCodecs globals + resize support
+// or, without the Mediabunny-specific extras:
+import 'node-webcodecs/register';    // just the WebCodecs globals
+
+import { Input, ALL_FORMATS, FilePathSource, VideoSampleSink } from 'mediabunny';
+
+const input = new Input({ formats: ALL_FORMATS, source: new FilePathSource('video.mp4') });
+const track = await input.getPrimaryVideoTrack();
+const sink = new VideoSampleSink(track);
+
+for await (const sample of sink.samples()) {
+  // full-speed, frame-accurate decoding — no browser required
+  sample.close();
+}
+```
+
+Measured against `@mediabunny/server` (NodeAV backend) on the same 1080p file: ~7x faster full-file decode, identical pixels, and 1.5x faster resize transcodes. `node-webcodecs/mediabunny` registers a `VideoSample` transformer covering plain resizing (`fit: 'fill'`, or `contain`/`cover` with matching aspect ratio); rotation and cropping are not yet handled.
+
 ## Performance
 
 Decoding is multithreaded (FFmpeg auto-detects core count) and decoded frames are delivered zero-copy. Measured at 1080p over 150 frames on an Apple M4 Pro (v1.1.4, software codecs):

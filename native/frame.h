@@ -8,6 +8,7 @@ extern "C" {
 #include <libavutil/pixfmt.h>
 #include <libavutil/imgutils.h>
 #include <libswscale/swscale.h>
+#include <libavutil/opt.h>
 }
 
 class VideoFrameNative : public Napi::ObjectWrap<VideoFrameNative> {
@@ -27,6 +28,7 @@ private:
     Napi::Value AllocationSize(const Napi::CallbackInfo& info);
     Napi::Value CopyTo(const Napi::CallbackInfo& info);
     Napi::Value Clone(const Napi::CallbackInfo& info);
+    Napi::Value Scale(const Napi::CallbackInfo& info);
     void Close(const Napi::CallbackInfo& info);
 
     Napi::Value GetWidth(const Napi::CallbackInfo& info);

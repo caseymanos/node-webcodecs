@@ -224,6 +224,25 @@ export class VideoFrame {
   }
 
   /**
+   * Scale to new dimensions with FFmpeg's threaded scaler, preserving pixel
+   * format and color space (internal use only).
+   */
+  _scale(width: number, height: number): VideoFrame {
+    this._assertNotClosed();
+    if (!this._native) {
+      throw new DOMException('No native frame to scale', 'InvalidStateError');
+    }
+    const scaled = VideoFrame._adopt(
+      this._native.scale(width, height),
+      this._timestamp,
+      this._duration ?? undefined
+    );
+    scaled._colorSpace = this._colorSpace;
+    scaled._format = this._format;
+    return scaled;
+  }
+
+  /**
    * Get the native frame handle (internal use only)
    */
   _getNative(): any {

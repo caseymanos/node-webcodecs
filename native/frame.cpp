@@ -8,6 +8,7 @@ Napi::Object VideoFrameNative::Init(Napi::Env env, Napi::Object exports) {
         InstanceMethod("allocationSize", &VideoFrameNative::AllocationSize),
         InstanceMethod("copyTo", &VideoFrameNative::CopyTo),
         InstanceMethod("clone", &VideoFrameNative::Clone),
+        InstanceMethod("scale", &VideoFrameNative::Scale),
         InstanceMethod("close", &VideoFrameNative::Close),
         InstanceAccessor("width", &VideoFrameNative::GetWidth, nullptr),
         InstanceAccessor("height", &VideoFrameNative::GetHeight, nullptr),
@@ -458,6 +459,68 @@ Napi::Value VideoFrameNative::GetFormat(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
     return Napi::String::New(info.Env(), PixelFormatToString((AVPixelFormat)frame_->format));
+}
+
+
+Napi::Value VideoFrameNative::Scale(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+
+    if (!frame_) {
+        Napi::Error::New(env, "Frame is closed").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsNumber()) {
+        Napi::TypeError::New(env, "scale(width, height) expects two numbers").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+
+    int dstW = info[0].As<Napi::Number>().Int32Value();
+    int dstH = info[1].As<Napi::Number>().Int32Value();
+    if (dstW <= 0 || dstH <= 0) {
+        Napi::TypeError::New(env, "scale dimensions must be positive").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+
+    AVFrame* out = av_frame_alloc();
+    out->format = frame_->format;
+    out->width = dstW;
+    out->height = dstH;
+    out->pts = frame_->pts;
+    out->duration = frame_->duration;
+
+    if (av_frame_get_buffer(out, 0) < 0) {
+        av_frame_free(&out);
+        Napi::Error::New(env, "Failed to allocate scaled frame").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+
+    // threads=0 -> auto; sws_getContext would be single-threaded
+    SwsContext* sws = sws_alloc_context();
+    av_opt_set_int(sws, "srcw", frame_->width, 0);
+    av_opt_set_int(sws, "srch", frame_->height, 0);
+    av_opt_set_int(sws, "src_format", frame_->format, 0);
+    av_opt_set_int(sws, "dstw", dstW, 0);
+    av_opt_set_int(sws, "dsth", dstH, 0);
+    av_opt_set_int(sws, "dst_format", frame_->format, 0);
+    av_opt_set_int(sws, "sws_flags", SWS_BILINEAR, 0);
+    av_opt_set_int(sws, "threads", 0, 0);
+    if (sws_init_context(sws, nullptr, nullptr) < 0) {
+        sws_freeContext(sws);
+        av_frame_free(&out);
+        Napi::Error::New(env, "Failed to create scaler for this pixel format").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+
+    int ret = sws_scale_frame(sws, out, frame_);
+    sws_freeContext(sws);
+    if (ret < 0) {
+        av_frame_free(&out);
+        Napi::Error::New(env, "Scaling failed").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+
+    av_frame_copy_props(out, frame_);
+    return NewInstance(env, out);
 }
 
 Napi::Object VideoFrameNative::NewInstance(Napi::Env env, AVFrame* frame) {

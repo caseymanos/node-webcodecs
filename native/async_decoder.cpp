@@ -47,6 +47,39 @@ VideoDecoderAsync::VideoDecoderAsync(const Napi::CallbackInfo& info)
         0,
         1
     );
+
+    // Don't hold the event loop open when idle; a pending flush() holds it
+    // via tsfnFlush_ instead, so awaited work still completes
+    tsfnOutput_.Unref(env);
+    tsfnError_.Unref(env);
+
+    // Fires on the JS thread after the worker finishes each job, so the
+    // in-flight ref count and event-loop ref are only touched on one thread
+    tsfnJobDone_ = Napi::ThreadSafeFunction::New(
+        env,
+        Napi::Function::New(env, [](const Napi::CallbackInfo&) {}),
+        "VideoDecoderAsyncJobDone",
+        0,
+        1
+    );
+    tsfnJobDone_.Unref(env);
+
+    // At env teardown TSFNs are finalized before this wrapper's destructor
+    // runs; flag it so the destructor skips Release on dead handles
+    env.AddCleanupHook([](bool* flag) { *flag = true; }, &envTeardown_);
+}
+
+// Hold the event loop open while jobs are in flight (JS thread only)
+void VideoDecoderAsync::JobSubmitted(Napi::Env env) {
+    if (activeJobs_++ == 0) {
+        tsfnOutput_.Ref(env);
+    }
+}
+
+void VideoDecoderAsync::JobFinished(Napi::Env env) {
+    if (activeJobs_ > 0 && --activeJobs_ == 0) {
+        tsfnOutput_.Unref(env);
+    }
 }
 
 VideoDecoderAsync::~VideoDecoderAsync() {
@@ -64,11 +97,12 @@ VideoDecoderAsync::~VideoDecoderAsync() {
         avcodec_free_context(&codecCtx_);
     }
 
-    // Release thread-safe functions
-    tsfnOutput_.Release();
-    tsfnError_.Release();
-    if (tsfnFlush_) {
-        tsfnFlush_.Release();
+    // Release thread-safe functions unless env teardown already finalized them
+    if (!envTeardown_) {
+        if (tsfnOutput_) tsfnOutput_.Release();
+        if (tsfnError_) tsfnError_.Release();
+        if (tsfnFlush_) tsfnFlush_.Release();
+        if (tsfnJobDone_) tsfnJobDone_.Release();
     }
 }
 
@@ -198,6 +232,10 @@ void VideoDecoderAsync::WorkerThread() {
         } else {
             ProcessDecode(job);
         }
+
+        tsfnJobDone_.NonBlockingCall([this](Napi::Env env, Napi::Function) {
+            JobFinished(env);
+        });
     }
 }
 
@@ -336,6 +374,9 @@ void VideoDecoderAsync::ProcessFlush() {
         tsfnFlush_.NonBlockingCall([](Napi::Env env, Napi::Function fn) {
             fn.Call({ env.Null() });
         });
+        // Queued call still runs; releasing lets the event loop drain after it
+        tsfnFlush_.Release();
+        tsfnFlush_ = Napi::ThreadSafeFunction();
     }
 
     flushPending_ = false;
@@ -367,6 +408,7 @@ void VideoDecoderAsync::Decode(const Napi::CallbackInfo& info) {
         jobQueue_.push(std::move(job));
     }
     queueCV_.notify_one();
+    JobSubmitted(env);
 }
 
 Napi::Value VideoDecoderAsync::Flush(const Napi::CallbackInfo& info) {
@@ -380,6 +422,7 @@ Napi::Value VideoDecoderAsync::Flush(const Napi::CallbackInfo& info) {
 
     // Create thread-safe function for flush callback
     Napi::Function callback = info[0].As<Napi::Function>();
+    if (tsfnFlush_) tsfnFlush_.Release();  // stale handle from an unresolved earlier flush
     tsfnFlush_ = Napi::ThreadSafeFunction::New(
         env,
         callback,
@@ -399,6 +442,7 @@ Napi::Value VideoDecoderAsync::Flush(const Napi::CallbackInfo& info) {
         jobQueue_.push(std::move(job));
     }
     queueCV_.notify_one();
+    JobSubmitted(env);
 
     return env.Undefined();
 }
@@ -439,6 +483,14 @@ void VideoDecoderAsync::Close(const Napi::CallbackInfo& info) {
         avcodec_free_context(&codecCtx_);
         codecCtx_ = nullptr;
     }
+
+    // Worker is joined, so no more calls are queued; release now and null the
+    // handles so the destructor doesn't touch already-finalized functions
+    if (tsfnOutput_) { tsfnOutput_.Release(); tsfnOutput_ = Napi::ThreadSafeFunction(); }
+    if (tsfnError_) { tsfnError_.Release(); tsfnError_ = Napi::ThreadSafeFunction(); }
+    if (tsfnFlush_) { tsfnFlush_.Release(); tsfnFlush_ = Napi::ThreadSafeFunction(); }
+    if (tsfnJobDone_) { tsfnJobDone_.Release(); tsfnJobDone_ = Napi::ThreadSafeFunction(); }
+    activeJobs_ = 0;
 
     configured_ = false;
 }
