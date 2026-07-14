@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.1.1] - 2026-07-14
+## [1.1.2] - 2026-07-14
 
 ### Highlights
 - **Up to 6x faster decoding** - FFmpeg threading was never enabled (thread_count defaulted to 1); decoders and the non-realtime encoder path now auto-detect core count
