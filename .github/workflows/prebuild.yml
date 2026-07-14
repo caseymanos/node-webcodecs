@@ -79,7 +79,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           # no registry-url: it writes an _authToken .npmrc line, which
           # makes npm use token auth instead of OIDC trusted publishing
 
@@ -116,7 +116,7 @@ jobs:
 
       # npm trusted publishing (OIDC) requires npm >= 11.5.1; Node 20 bundles npm 10
       - name: Update npm for trusted publishing
-        run: npm install -g npm@11
+        run: npm install -g npm@latest
 
       - name: Publish to npm with provenance
         run: npm publish --access public --provenance
