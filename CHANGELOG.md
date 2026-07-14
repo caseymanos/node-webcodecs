@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.5] - 2026-07-14
+
+### Improved
+- Multithreaded pixel format conversion in encoders (sws_getContext is single-threaded; now threads=auto). RGBA->YUV at 1080p drops ~5ms to ~2.5ms per frame; VP9 encode from RGBA goes 35 -> 60 fps.
+
 ## [1.1.4] - 2026-07-14
 
 ### Highlights
