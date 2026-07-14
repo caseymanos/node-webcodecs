@@ -34,6 +34,7 @@ export class AudioDecoder {
   private _outputCallback: (data: AudioData) => void;
   private _errorCallback: (error: DOMException) => void;
   private _decodeQueueSize: number = 0;
+  private _pendingCallbacks: number = 0;  // Track pending setImmediate callbacks
   private _config: AudioDecoderConfig | null = null;
   private _ondequeue: ((event: Event) => void) | null = null;
   private _listeners: Map<string, Set<() => void>> = new Map();
@@ -204,10 +205,14 @@ export class AudioDecoder {
     }
 
     return new Promise((resolve, reject) => {
-      this._native.flush((err: Error | null) => {
+      this._native.flush(async (err: Error | null) => {
         if (err) {
           reject(new DOMException(err.message, 'EncodingError'));
         } else {
+          // Wait for any pending setImmediate callbacks to complete
+          while (this._pendingCallbacks > 0) {
+            await new Promise(r => setImmediate(r));
+          }
           resolve();
         }
       });
@@ -252,7 +257,9 @@ export class AudioDecoder {
 
     // Defer callback to ensure decodeQueueSize > 0 when decode() returns
     // Use setImmediate to allow the event loop to process the listener registration
+    this._pendingCallbacks++;
     setImmediate(() => {
+      this._pendingCallbacks--;
       this._decodeQueueSize = Math.max(0, this._decodeQueueSize - 1);
 
       // Dispatch dequeue event
