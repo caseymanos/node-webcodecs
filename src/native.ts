@@ -21,7 +21,7 @@ import path from 'path';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const nodeGypBuild = require('node-gyp-build');
 
-export type NativeVariant = 'prebuild' | 'static' | 'source';
+export type NativeVariant = 'dynamic' | 'static' | 'source';
 
 const packageRoot = path.join(__dirname, '..');
 const staticPackage = `@node-webcodecs/static-${process.platform}-${process.arch}`;
@@ -36,7 +36,7 @@ function loadNodeGypBuild(requireSource: boolean): any {
   }
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const binding = require(resolved);
-  loadedVariant = isPrebuild ? 'prebuild' : 'source';
+  loadedVariant = isPrebuild ? 'dynamic' : 'source';
   return binding;
 }
 

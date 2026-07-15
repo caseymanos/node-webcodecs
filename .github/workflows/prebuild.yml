@@ -194,7 +194,14 @@ jobs:
       - name: Publish static packages
         run: |
           for dir in npm-static/*/; do
-            echo "publishing $dir"
+            name=$(cd "$dir" && npm pkg get name | tr -d '"')
+            ver=$(cd "$dir" && npm pkg get version | tr -d '"')
+            # tolerate reruns after a partial publish
+            if npm view "$name@$ver" version >/dev/null 2>&1; then
+              echo "$name@$ver already published, skipping"
+              continue
+            fi
+            echo "publishing $name@$ver"
             (cd "$dir" && npm publish --access public --provenance)
           done
 

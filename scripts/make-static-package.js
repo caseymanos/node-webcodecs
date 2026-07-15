@@ -28,7 +28,8 @@ fs.writeFileSync(path.join(outDir, 'package.json'), JSON.stringify({
   description: `Statically-linked FFmpeg build of node-webcodecs for ${platform}-${arch}`,
   main: 'index.js',
   files: ['index.js', 'webcodecs.node', 'THIRD_PARTY_NOTICES.md'],
-  license: 'MIT',
+  // binary statically embeds LGPL/BSD components; see THIRD_PARTY_NOTICES.md
+  license: 'MIT AND LGPL-2.1-or-later AND BSD-2-Clause AND BSD-3-Clause',
   repository: main.repository,
   os: [platform],
   cpu: [arch],
