@@ -73,6 +73,8 @@ export { CodecState, BufferSource, DOMRectReadOnly } from './types';
 // Native utilities (if available)
 import { native as _native } from './native';
 
+export { getNativeVariant, NativeVariant } from './native';
+
 /**
  * Get FFmpeg version information
  */

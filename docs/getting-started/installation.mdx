@@ -6,12 +6,17 @@ description: "Platform-specific installation guide for node-webcodecs"
 ## Requirements
 
 - **Node.js** 18 or higher (or Bun 1.0+)
-- **FFmpeg libraries** (libavcodec, libavutil, libswscale, libswresample)
-- **pkg-config** (only when building from source)
-- **C++ compiler** (only when building from source; Xcode Command Line Tools on macOS, build-essential on Linux)
+- On **linux-x64**, **linux-arm64**, and **macOS arm64**: nothing else. `npm install node-webcodecs` works with zero system dependencies.
+- Elsewhere: FFmpeg libraries (libavcodec, libavutil, libswscale, libswresample), plus pkg-config and a C++ compiler when building from source
+
+The loader picks the first native binding that works:
+
+1. **Dynamic prebuild** — links your system FFmpeg (all its codecs, including GPL ones like x264/x265). Requires matching FFmpeg runtime libraries: 6.x on Linux (e.g. Ubuntu 24.04), current Homebrew FFmpeg on macOS.
+2. **Static prebuild** — bundled LGPL-only FFmpeg, shipped as a platform-specific `@node-webcodecs/static-*` optional dependency (~15 MB). Works in any Docker image, Lambda, or Fly with no FFmpeg installed. H.264 encode via openh264, AV1 encode via SVT-AV1, AV1 decode via dav1d; software HEVC *encode* is unavailable (hardware HEVC still works).
+3. **Source build** — compiles against your FFmpeg dev headers via cmake-js.
 
 <Note>
-Prebuilt binaries ship for macOS arm64 and Linux x64 — on those platforms nothing compiles at install time, so pkg-config and a compiler are not needed. Only the FFmpeg runtime libraries are required.
+Set `NODE_WEBCODECS_FORCE=dynamic|static|source` to pin a variant, and call `getNativeVariant()` to see which one loaded.
 </Note>
 
 ## Platform-Specific Setup
@@ -148,33 +153,26 @@ Prebuilt binaries ship for macOS arm64 and Linux x64 — on those platforms noth
   <Tab title="Docker">
     ### Docker Installation
 
-    Create a `Dockerfile` with FFmpeg pre-installed:
+    No FFmpeg needed — the static prebuild is used automatically in images without FFmpeg:
 
     ```dockerfile
-    FROM node:20
-
-    # Install FFmpeg and dependencies
-    RUN apt-get update && apt-get install -y \
-        ffmpeg \
-        libavcodec-dev \
-        libavutil-dev \
-        libswscale-dev \
-        libswresample-dev \
-        pkg-config \
-        build-essential \
-        && rm -rf /var/lib/apt/lists/*
+    FROM node:22-slim
 
     WORKDIR /app
-
-    # Copy package files
     COPY package*.json ./
-
-    # Install dependencies (includes node-webcodecs compilation)
     RUN npm install
-
     COPY . .
 
     CMD ["node", "index.js"]
+    ```
+
+    To use the dynamic prebuild instead (adds GPL codecs like x264/x265 software encode), install FFmpeg runtime libraries in an image whose FFmpeg major version matches (6.x on Linux):
+
+    ```dockerfile
+    FROM ubuntu:24.04
+    RUN apt-get update && apt-get install -y nodejs npm \
+        libavcodec60 libavutil58 libswscale7 libswresample4 \
+        && rm -rf /var/lib/apt/lists/*
     ```
 
     Build and run:
@@ -269,11 +267,11 @@ console.log('VP9 decoder:', hasCodec('vp9', 'decoder'));
   </Accordion>
 
   <Accordion title="Using prebuilt binaries">
-    v1.0.0+ includes prebuilt binaries for:
-    - macOS (arm64, x64)
-    - Linux (x64)
+    Dynamic prebuilds (system FFmpeg required at runtime): macOS arm64/x64, Linux x64/arm64.
 
-    These are automatically used if your platform matches. You still need FFmpeg libraries installed at runtime.
+    Static prebuilds (no FFmpeg required, v1.3.0+): linux-x64, linux-arm64, darwin-arm64 via `@node-webcodecs/static-*` optional dependencies.
+
+    Check which one loaded with `getNativeVariant()` — returns `'prebuild'`, `'static'`, or `'source'`.
   </Accordion>
 </AccordionGroup>
 

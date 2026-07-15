@@ -33,6 +33,7 @@ static const std::vector<EncoderMapping> h264Encoders = {
     {"h264_v4l2m2m", Type::V4L2M2M, AV_PIX_FMT_YUV420P},
 #endif
     {"libx264", Type::None, AV_PIX_FMT_YUV420P},  // Software fallback
+    {"libopenh264", Type::None, AV_PIX_FMT_YUV420P},  // LGPL static builds (no x264)
 };
 
 // HEVC encoders by priority
@@ -159,8 +160,8 @@ static std::string getCodecType(const std::string& codecString) {
     }
 
     // FFmpeg encoder names
-    if (codecString == "libx264" || codecString == "h264" ||
-        codecString.find("h264_") == 0) {
+    if (codecString == "libx264" || codecString == "libopenh264" ||
+        codecString == "h264" || codecString.find("h264_") == 0) {
         return "h264";
     } else if (codecString == "libx265" || codecString == "hevc" ||
                codecString.find("hevc_") == 0) {

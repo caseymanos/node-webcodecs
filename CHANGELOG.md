@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.0] - unreleased
+
+### Added
+- **Zero-dependency installs**: statically-linked FFmpeg prebuilds for linux-x64, linux-arm64, and darwin-arm64, shipped as platform-specific `@node-webcodecs/static-*` optional dependencies (~15 MB each, only your platform downloads). `npm install node-webcodecs` now works in any Docker base image (including `node:22`), Lambda, and Fly with no FFmpeg installed.
+- Loader resolution order: dynamic prebuild (system FFmpeg, preferred) → static prebuild → source build. Override with `NODE_WEBCODECS_FORCE=dynamic|static|source`; inspect with the new `getNativeVariant()` export.
+- The static build is LGPL-only (FFmpeg `--disable-gpl` + BSD codec libs): H.264 encode via openh264, AV1 encode via SVT-AV1, AV1 decode via dav1d, VP8/VP9 via libvpx, plus native AAC/FLAC/PCM, libopus, and libmp3lame. Software HEVC encode is unavailable in the static variant (no x265); hardware HEVC (VideoToolbox, NVENC) still works.
+
+
 ## [1.2.2] - 2026-07-14
 
 ### Added
