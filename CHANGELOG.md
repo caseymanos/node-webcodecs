@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.3.0] - unreleased
+## [1.3.0] - 2026-07-15
 
 ### Added
 - **Zero-dependency installs**: statically-linked FFmpeg prebuilds for linux-x64, linux-arm64, and darwin-arm64, shipped as platform-specific `@node-webcodecs/static-*` optional dependencies (~15 MB each, only your platform downloads). `npm install node-webcodecs` now works in any Docker base image (including `node:22`), Lambda, and Fly with no FFmpeg installed.
