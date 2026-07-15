@@ -7,8 +7,6 @@
 - Loader resolution order: dynamic prebuild (system FFmpeg, preferred) → static prebuild → source build. Override with `NODE_WEBCODECS_FORCE=dynamic|static|source`; inspect with the new `getNativeVariant()` export.
 - The static build is LGPL-only (FFmpeg `--disable-gpl` + BSD codec libs): H.264 encode via openh264, AV1 encode via SVT-AV1, AV1 decode via dav1d, VP8/VP9 via libvpx, plus native AAC/FLAC/PCM, libopus, and libmp3lame. Software HEVC encode is unavailable in the static variant (no x265); hardware HEVC (VideoToolbox, NVENC) still works.
 
-### Fixed
-- `hardwareAcceleration: 'prefer-software'` now respects the encoder priority list (it previously scanned in reverse, so e.g. AV1 picked libaom over the faster SVT-AV1 when both were installed)
 
 ## [1.2.2] - 2026-07-14
 

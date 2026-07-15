@@ -261,7 +261,20 @@ EncoderInfo selectEncoder(
         return info;  // Unknown codec
     }
 
-    // Try encoders in priority order (software-only when preferred)
+    // If prefer software, start from the end (software encoders)
+    if (preference == Preference::PreferSoftware) {
+        for (auto it = encoders.rbegin(); it != encoders.rend(); ++it) {
+            if (it->type == Type::None && isEncoderAvailable(it->hwEncoder)) {
+                info.codec = avcodec_find_encoder_by_name(it->hwEncoder);
+                info.hwType = Type::None;
+                info.inputFormat = it->preferredFormat;
+                info.name = it->hwEncoder;
+                return info;
+            }
+        }
+    }
+
+    // Try encoders in priority order
     for (const auto& enc : encoders) {
         // Skip HW encoders if we want software only
         if (preference == Preference::PreferSoftware && enc.type != Type::None) {
@@ -309,7 +322,20 @@ DecoderInfo selectDecoder(
         return info;
     }
 
-    // Try decoders in priority order (software-only when preferred)
+    // If prefer software, start from the end
+    if (preference == Preference::PreferSoftware) {
+        for (auto it = decoders.rbegin(); it != decoders.rend(); ++it) {
+            if (it->type == Type::None && isDecoderAvailable(it->hwEncoder)) {
+                info.codec = avcodec_find_decoder_by_name(it->hwEncoder);
+                info.hwType = Type::None;
+                info.outputFormat = it->preferredFormat;
+                info.name = it->hwEncoder;
+                return info;
+            }
+        }
+    }
+
+    // Try decoders in priority order
     for (const auto& dec : decoders) {
         if (preference == Preference::PreferSoftware && dec.type != Type::None) {
             continue;
