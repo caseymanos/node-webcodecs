@@ -33,6 +33,7 @@ static const std::vector<EncoderMapping> h264Encoders = {
     {"h264_v4l2m2m", Type::V4L2M2M, AV_PIX_FMT_YUV420P},
 #endif
     {"libx264", Type::None, AV_PIX_FMT_YUV420P},  // Software fallback
+    {"libopenh264", Type::None, AV_PIX_FMT_YUV420P},  // LGPL static builds (no x264)
 };
 
 // HEVC encoders by priority
@@ -159,8 +160,8 @@ static std::string getCodecType(const std::string& codecString) {
     }
 
     // FFmpeg encoder names
-    if (codecString == "libx264" || codecString == "h264" ||
-        codecString.find("h264_") == 0) {
+    if (codecString == "libx264" || codecString == "libopenh264" ||
+        codecString == "h264" || codecString.find("h264_") == 0) {
         return "h264";
     } else if (codecString == "libx265" || codecString == "hevc" ||
                codecString.find("hevc_") == 0) {
@@ -260,20 +261,7 @@ EncoderInfo selectEncoder(
         return info;  // Unknown codec
     }
 
-    // If prefer software, start from the end (software encoders)
-    if (preference == Preference::PreferSoftware) {
-        for (auto it = encoders.rbegin(); it != encoders.rend(); ++it) {
-            if (it->type == Type::None && isEncoderAvailable(it->hwEncoder)) {
-                info.codec = avcodec_find_encoder_by_name(it->hwEncoder);
-                info.hwType = Type::None;
-                info.inputFormat = it->preferredFormat;
-                info.name = it->hwEncoder;
-                return info;
-            }
-        }
-    }
-
-    // Try encoders in priority order
+    // Try encoders in priority order (software-only when preferred)
     for (const auto& enc : encoders) {
         // Skip HW encoders if we want software only
         if (preference == Preference::PreferSoftware && enc.type != Type::None) {
@@ -321,20 +309,7 @@ DecoderInfo selectDecoder(
         return info;
     }
 
-    // If prefer software, start from the end
-    if (preference == Preference::PreferSoftware) {
-        for (auto it = decoders.rbegin(); it != decoders.rend(); ++it) {
-            if (it->type == Type::None && isDecoderAvailable(it->hwEncoder)) {
-                info.codec = avcodec_find_decoder_by_name(it->hwEncoder);
-                info.hwType = Type::None;
-                info.outputFormat = it->preferredFormat;
-                info.name = it->hwEncoder;
-                return info;
-            }
-        }
-    }
-
-    // Try decoders in priority order
+    // Try decoders in priority order (software-only when preferred)
     for (const auto& dec : decoders) {
         if (preference == Preference::PreferSoftware && dec.type != Type::None) {
             continue;

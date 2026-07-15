@@ -64,8 +64,142 @@ jobs:
           path: prebuilds/
           retention-days: 30
 
+  # Statically-linked FFmpeg prebuilds, shipped as @node-webcodecs/static-* packages.
+  # Linux builds run in a bullseye container so the .node needs only glibc >= 2.31.
+  static:
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux
+            arch: x64
+            container: node:20-bullseye
+          - os: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
+            container: node:20-bullseye
+          - os: macos-14
+            platform: darwin
+            arch: arm64
+            container: ''
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        if: runner.os == 'macOS'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Cache static FFmpeg
+        id: ffmpeg-cache
+        uses: actions/cache@v4
+        with:
+          path: .ffmpeg-static/${{ matrix.platform }}-${{ matrix.arch }}
+          key: ffmpeg-static-${{ matrix.platform }}-${{ matrix.arch }}-${{ hashFiles('scripts/ffmpeg-static/build.sh') }}
+
+      - name: Install FFmpeg build toolchain (Linux)
+        if: runner.os == 'Linux' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        run: |
+          apt-get update
+          apt-get install -y build-essential pkg-config nasm python3-pip
+          # bullseye's cmake/meson are too old for SVT-AV1/dav1d
+          pip3 install cmake meson ninja
+
+      - name: Install FFmpeg build toolchain (macOS)
+        if: runner.os == 'macOS' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        run: brew install nasm meson ninja
+
+      - name: Build static FFmpeg
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        run: ./scripts/ffmpeg-static/build.sh
+
+      - name: Install compiler for addon (Linux, cache hit)
+        if: runner.os == 'Linux' && steps.ffmpeg-cache.outputs.cache-hit == 'true'
+        run: |
+          apt-get update
+          apt-get install -y build-essential pkg-config
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build static addon
+        run: |
+          export PKG_CONFIG_PATH="$PWD/.ffmpeg-static/${{ matrix.platform }}-${{ matrix.arch }}/lib/pkgconfig"
+          npx cmake-js compile --CDWEBCODECS_STATIC_FFMPEG=ON --out build-static
+
+      - name: Strip and inspect binary
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            strip --strip-unneeded build-static/Release/webcodecs_node.node
+            objdump -T build-static/Release/webcodecs_node.node | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -1
+          else
+            strip -x build-static/Release/webcodecs_node.node
+          fi
+          ls -la build-static/Release/webcodecs_node.node
+
+      - name: Package static prebuild
+        run: node scripts/make-static-package.js ${{ matrix.platform }} ${{ matrix.arch }} build-static/Release/webcodecs_node.node
+
+      - name: Test against static build
+        run: |
+          npm run build:ts
+          mkdir -p node_modules/@node-webcodecs
+          ln -s "$PWD/npm-static/${{ matrix.platform }}-${{ matrix.arch }}" "node_modules/@node-webcodecs/static-${{ matrix.platform }}-${{ matrix.arch }}"
+          NODE_WEBCODECS_FORCE=static npm test
+          NODE_WEBCODECS_FORCE=static npm run test:integration
+
+      - name: Upload static package
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-${{ matrix.platform }}-${{ matrix.arch }}
+          path: npm-static/
+          retention-days: 30
+
+  publish-static:
+    needs: static
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    # Required for npm OIDC trusted publishing
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          # no registry-url: it writes an _authToken .npmrc line, which
+          # makes npm use token auth instead of OIDC trusted publishing
+
+      - name: Download static packages
+        uses: actions/download-artifact@v4
+        with:
+          path: npm-static
+          pattern: static-*
+          merge-multiple: true
+
+      # npm trusted publishing (OIDC) requires npm >= 11.5.1
+      - name: Update npm for trusted publishing
+        run: npm install -g npm@latest
+
+      # Each @node-webcodecs/static-* package needs its own trusted-publisher
+      # config on npmjs.com pointing at this repo + workflow.
+      - name: Publish static packages
+        run: |
+          for dir in npm-static/*/; do
+            echo "publishing $dir"
+            (cd "$dir" && npm publish --access public --provenance)
+          done
+
   publish:
-    needs: prebuild
+    needs: [prebuild, publish-static]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
 
@@ -118,6 +252,15 @@ jobs:
       # npm trusted publishing (OIDC) requires npm >= 11.5.1; Node 20 bundles npm 10
       - name: Update npm for trusted publishing
         run: npm install -g npm@latest
+
+      # Injected at publish time (not committed) so local installs before the
+      # static packages exist on npm don't fail resolution.
+      - name: Add static prebuild optionalDependencies
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          npm pkg set "optionalDependencies.@node-webcodecs/static-linux-x64=$VERSION" \
+                      "optionalDependencies.@node-webcodecs/static-linux-arm64=$VERSION" \
+                      "optionalDependencies.@node-webcodecs/static-darwin-arm64=$VERSION"
 
       - name: Publish to npm with provenance
         run: npm publish --access public --provenance

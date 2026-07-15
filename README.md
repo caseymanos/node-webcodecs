@@ -26,11 +26,19 @@ Native WebCodecs API implementation for Node.js, using FFmpeg for encoding and d
 ## Requirements
 
 - Node.js 18+
-- FFmpeg libraries (libavcodec, libavutil, libswscale, libswresample)
+- No system dependencies on **linux-x64**, **linux-arm64**, and **macOS arm64** — see below
 
-Prebuilt binaries ship for **macOS arm64**, **Linux x64**, and **Linux arm64**, so on those platforms nothing compiles at install time — you only need the FFmpeg runtime libraries. The prebuilds link dynamically, so the installed FFmpeg major version must match what they were built against: FFmpeg 6.x on Linux (e.g. Ubuntu 24.04; Debian bookworm ships 5.x) and the current Homebrew FFmpeg on macOS. When no prebuild matches, the addon builds from source, which additionally requires `cmake`, `pkg-config`, and a C++ compiler (Xcode Command Line Tools on macOS, build-essential on Linux).
+The loader resolves a native binding in this order:
+
+1. **Dynamic prebuild** — links your system FFmpeg (all codecs your FFmpeg has, including GPL ones like x264/x265). Requires FFmpeg runtime libraries whose major version matches the prebuild: FFmpeg 6.x on Linux (e.g. Ubuntu 24.04), current Homebrew FFmpeg on macOS.
+2. **Static prebuild** — a statically-linked, LGPL-only FFmpeg shipped as a platform-specific `@node-webcodecs/static-*` optional dependency (~15 MB, only your platform is downloaded). Zero system dependencies: works in any Docker base image, Lambda, Fly, etc. H.264 encode uses openh264, AV1 encode uses SVT-AV1, AV1 decode uses dav1d. No GPL components, so **software HEVC encode is unavailable** (hardware HEVC encode still works where present).
+3. **Source build** — `cmake-js` compiles against your FFmpeg dev headers. Requires `cmake`, `pkg-config`, a C++ compiler, and FFmpeg dev packages.
+
+Set `NODE_WEBCODECS_FORCE=dynamic|static|source` to pin a specific variant (both at install time and at runtime), and call `getNativeVariant()` to see which one loaded.
 
 ### Installing Dependencies
+
+Only needed for the dynamic prebuild (preferred when present) or source builds — installs with none of this work via the static prebuild.
 
 **macOS (Homebrew):**
 ```bash

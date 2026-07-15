@@ -3,8 +3,11 @@ node_modules/
 
 # Build outputs
 build/
+build-static/
 dist/
 prebuilds/
+npm-static/
+.ffmpeg-static/
 
 # IDE
 .vscode/
