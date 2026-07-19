@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.3.1] - 2026-07-18
+
+### Fixed
+- Intermittent crash at process exit (SIGSEGV/SIGABRT during teardown). Each codec instance registered an env cleanup hook pointing into itself and never removed it; instances collected during the process's lifetime left dangling hooks that corrupted Node's cleanup queue when run at exit. One process-level flag now serves all instances, and codec objects are pinned while work is in flight so queued completion callbacks can never outlive them. Also the likely cause of the ubuntu CI flake since v1.2.0 and the FFmpeg-7.x static-build aborts.
+
 ## [1.3.0] - 2026-07-15
 
 ### Added

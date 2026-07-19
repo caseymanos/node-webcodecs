@@ -1,4 +1,5 @@
 #include <napi.h>
+#include "env_state.h"
 #include "frame.h"
 #include "audio.h"
 #include "encoder.h"
@@ -11,7 +12,14 @@
 // Forward declaration
 void InitUtil(Napi::Env env, Napi::Object exports);
 
+std::atomic<bool> nwc_env_teardown{false};
+
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
+    // One hook with static-lifetime state; per-instance hooks dangled after
+    // GC and corrupted node's cleanup queue at exit
+    env.AddCleanupHook([](std::atomic<bool>* flag) { flag->store(true); },
+                       &nwc_env_teardown);
+
     // Initialize frame classes
     VideoFrameNative::Init(env, exports);
 

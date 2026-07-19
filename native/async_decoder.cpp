@@ -1,4 +1,5 @@
 #include "async_decoder.h"
+#include "env_state.h"
 #include "frame.h"
 
 Napi::FunctionReference VideoDecoderAsync::constructor;
@@ -63,22 +64,22 @@ VideoDecoderAsync::VideoDecoderAsync(const Napi::CallbackInfo& info)
         1
     );
     tsfnJobDone_.Unref(env);
-
-    // At env teardown TSFNs are finalized before this wrapper's destructor
-    // runs; flag it so the destructor skips Release on dead handles
-    env.AddCleanupHook([](bool* flag) { *flag = true; }, &envTeardown_);
 }
 
 // Hold the event loop open while jobs are in flight (JS thread only)
 void VideoDecoderAsync::JobSubmitted(Napi::Env env) {
     if (activeJobs_++ == 0) {
         tsfnOutput_.Ref(env);
+        // pin the wrapper so queued job-done callbacks (which capture this)
+        // can never outlive the instance
+        Ref();
     }
 }
 
 void VideoDecoderAsync::JobFinished(Napi::Env env) {
     if (activeJobs_ > 0 && --activeJobs_ == 0) {
         tsfnOutput_.Unref(env);
+        Unref();
     }
 }
 
@@ -98,7 +99,7 @@ VideoDecoderAsync::~VideoDecoderAsync() {
     }
 
     // Release thread-safe functions unless env teardown already finalized them
-    if (!envTeardown_) {
+    if (!nwc_env_teardown.load()) {
         if (tsfnOutput_) tsfnOutput_.Release();
         if (tsfnError_) tsfnError_.Release();
         if (tsfnFlush_) tsfnFlush_.Release();
@@ -490,7 +491,10 @@ void VideoDecoderAsync::Close(const Napi::CallbackInfo& info) {
     if (tsfnError_) { tsfnError_.Release(); tsfnError_ = Napi::ThreadSafeFunction(); }
     if (tsfnFlush_) { tsfnFlush_.Release(); tsfnFlush_ = Napi::ThreadSafeFunction(); }
     if (tsfnJobDone_) { tsfnJobDone_.Release(); tsfnJobDone_ = Napi::ThreadSafeFunction(); }
-    activeJobs_ = 0;
+    if (activeJobs_ > 0) {
+        activeJobs_ = 0;
+        Unref();  // balance the in-flight pin; queued JobFinished sees 0 and skips
+    }
 
     configured_ = false;
 }

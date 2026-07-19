@@ -71,7 +71,7 @@ private:
 
     // Worker thread
     std::thread workerThread_;
-    bool envTeardown_ = false;
+
     Napi::ThreadSafeFunction tsfnJobDone_;
     int activeJobs_ = 0;
     void JobSubmitted(Napi::Env env);
